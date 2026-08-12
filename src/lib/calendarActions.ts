@@ -84,6 +84,7 @@ export function workoutPlanItemToPlannedWorkout(item: WorkoutPlanItem): PlannedW
     targetPace: item.targetPace,
     targetHR: item.targetHR,
     description: item.description ?? '',
+    intervals: item.intervals,
     bookReference: item.bookReference,
   });
 }

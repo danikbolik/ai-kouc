@@ -207,7 +207,7 @@ ${message}
 ## Profil sportovce
 ${userMetrics ? buildUserProfileContext(userMetrics) : 'N/A'}
 
-## Metodický RAG kontext (JEDINÝ povolený zdroj teorie)
+## Metodický RAG kontext (kombinuj všechny zdroje – lokální soubory, nahrané podklady, vestavěná knihovna)
 ${methodicContext ?? 'Kontext nedostupný – odpověz, že chybí metodické podklady.'}
 
 ## Tréninkový kalendář – plánované i odtrénované tréninky
@@ -216,8 +216,10 @@ ${periodLine}
 ${calendarContext}
 
 ## Nástroje pro úpravu kalendáře
-Pokud sportovec žádá změnu plánu, vrať calendarActions (upsert_session / delete_session).
-Session id musí být unikátní. Zamčené session neměň.
+Pokud sportovec žádá naplánování, úpravu nebo doplnění tréninků, VŽDY zavolej funkci create_workout_plan.
+Tréninky se automaticky zapíší do kalendáře – nepopisuj plán pouze v textu bez volání nástroje.
+Každý trénink: date (YYYY-MM-DD), phase (AM/PM/EVENING), title, type, description; u intervalů vyplň intervals.
+Zamčené tréninky (isLocked) neměň ani nemaž.
 `.trim();
 }
 

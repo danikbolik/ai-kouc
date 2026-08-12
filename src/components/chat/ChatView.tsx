@@ -6,6 +6,7 @@ import { buildApiKeyHeaders } from '../../lib/apiKeyHeaders';
 import { planItemsToCalendarActions } from '../../lib/calendarActions';
 import { readPlainTextStream } from '../../lib/readPlainTextStream';
 import { buildVisiblePeriodContext } from '../../lib/visiblePeriod';
+import { CHAT_WELCOME_MESSAGE, useChatStore } from '../../store/useChatStore';
 import { useTrainingStore } from '../../store/useTrainingStore';
 import type { CalendarAction, ChatReference, WorkoutPlanItem } from '../../types/api';
 import type { ChatMessage, DynamicReference } from '../../types/chat';
@@ -16,13 +17,6 @@ const SUGGESTED_PROMPTS = [
   'Naplánuj mi na příští týden 4 běžecké dny podle metodiky.',
   'Jak mám upravit plán, pokud se cítím mírně nachlazený?',
 ];
-
-const WELCOME_MESSAGE: ChatMessage = {
-  id: 'welcome',
-  sender: 'assistant',
-  text: 'Ahoj! Jsem tvůj **metodický AI konzultant**. Mohu vysvětlit logiku tréninkového plánu, vyhodnotit tvou zátěž, nebo navrhnout úpravy podle metodiky.\n\nNa co se chceš zeptat?',
-  timestamp: new Date().toISOString(),
-};
 
 function MarkdownText({ text }: { text: string }) {
   const lines = text.split('\n');
@@ -223,9 +217,11 @@ function applyChatResponse(
   pendingWorkoutPlan?: WorkoutPlanItem[];
   planApplied: boolean;
 } {
-  const actions = data.calendarActions ?? [];
   const workoutPlan = data.workoutPlan ?? [];
   const savedCoachNotes = data.savedCoachNotes ?? [];
+  const actions =
+    (data.calendarActions?.length ? data.calendarActions : null) ??
+    (workoutPlan.length > 0 ? planItemsToCalendarActions(workoutPlan) : []);
   let planApplied = false;
 
   if (autoApply && actions.length > 0) {
@@ -251,7 +247,7 @@ function applyChatResponse(
   return {
     text,
     dynamicReferences: [...bookRefs, ...actionRefs],
-    pendingWorkoutPlan: workoutPlan.length > 0 ? workoutPlan : undefined,
+    pendingWorkoutPlan: planApplied ? undefined : workoutPlan.length > 0 ? workoutPlan : undefined,
     planApplied,
   };
 }
@@ -267,7 +263,7 @@ function InsertPlanButton({
   planApplied: boolean;
   onApply: (messageId: string, plan: WorkoutPlanItem[]) => void;
 }) {
-  if (plan.length === 0) return null;
+  if (plan.length === 0 || planApplied) return null;
 
   return (
     <button
@@ -344,7 +340,8 @@ export function ChatView() {
     [applyCalendarActions],
   );
 
-  const [messages, setMessages] = useState<ChatMessage[]>([WELCOME_MESSAGE]);
+  const messages = useChatStore((s) => s.messages);
+  const setMessages = useChatStore((s) => s.setMessages);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -353,6 +350,12 @@ export function ChatView() {
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, []);
+
+  useEffect(() => {
+    if (messages.length === 0) {
+      setMessages([CHAT_WELCOME_MESSAGE]);
+    }
+  }, [messages.length, setMessages]);
 
   useEffect(() => {
     scrollToBottom();
@@ -583,9 +586,8 @@ export function ChatView() {
           ) : (
             <>
               Načteno:{' '}
-              <span className="font-medium">Daniels&apos; Running Formula</span>,{' '}
-              <span className="font-medium">Uphill Athlete</span>
-              {' '}+ vestavěná knihovna + zobrazené období kalendáře
+              <span className="font-medium">více metodických zdrojů</span>
+              {' '}(Daniels, Uphill Athlete, nahrané podklady, vestavěná knihovna) + zobrazené období kalendáře
             </>
           )}
         </p>

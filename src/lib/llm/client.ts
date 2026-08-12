@@ -256,7 +256,7 @@ export async function chatWithTools(
     tools: {
       create_workout_plan: tool({
         description:
-          'Vloží plánované tréninky do kalendáře sportovce. Použij při žádosti o naplánování nebo úpravu tréninku.',
+          'Vloží plánované tréninky přímo do kalendáře sportovce. POVINNÉ při každém návrhu nebo úpravě tréninkového plánu – tréninky se automaticky synchronizují do kalendáře.',
         parameters: z.object({
           workouts: z.array(workoutPlanItemSchema).min(1),
         }),

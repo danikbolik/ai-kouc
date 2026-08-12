@@ -34,17 +34,19 @@ export default function HomePage() {
       <Header />
       <SettingsDrawer />
 
-      {activeTab === 'calendar' && (
-        <main className="flex flex-1 flex-col">
-          <CalendarView />
-        </main>
-      )}
+      <main className={activeTab === 'calendar' ? 'flex flex-1 flex-col' : 'hidden'}>
+        <CalendarView />
+      </main>
 
-      {activeTab === 'chat' && (
-        <main className="flex h-[calc(100vh-4rem)] flex-1 flex-col">
-          <ChatView />
-        </main>
-      )}
+      <main
+        className={
+          activeTab === 'chat'
+            ? 'flex h-[calc(100vh-4rem)] flex-1 flex-col'
+            : 'hidden h-[calc(100vh-4rem)] flex-1 flex-col'
+        }
+      >
+        <ChatView />
+      </main>
     </div>
   );
 }

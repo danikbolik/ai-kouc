@@ -60,7 +60,7 @@ export async function POST(request: Request) {
       localMethodologyContext: await getMethodologyContext(),
       uploadedMethodology: body.uploadedMethodology,
       query: body.message,
-      includeFullLibrary: !body.uploadedMethodology?.length,
+      includeFullLibrary: true,
     });
 
     const ragReferences = chunksToReferences(searchKnowledge(body.message, 6));

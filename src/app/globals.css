@@ -1,0 +1,20 @@
+@import '../styles/activity-theme.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer utilities {
+  .drawer-panel {
+    animation: drawer-slide-in 0.25s ease-out;
+  }
+}
+
+@keyframes drawer-slide-in {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}

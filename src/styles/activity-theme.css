@@ -1,0 +1,239 @@
+:root {
+  /* klus / longrun – emerald */
+  --activity-klus: #10b981;
+  --activity-klus-light: #ecfdf5;
+  --activity-klus-dark: #047857;
+  --activity-longrun: var(--activity-klus);
+  --activity-longrun-light: var(--activity-klus-light);
+  --activity-longrun-dark: var(--activity-klus-dark);
+
+  /* tempo / intervals – amber */
+  --activity-tempo: #f59e0b;
+  --activity-tempo-light: #fffbeb;
+  --activity-tempo-dark: #b45309;
+  --activity-intervals: var(--activity-tempo);
+  --activity-intervals-light: var(--activity-tempo-light);
+  --activity-intervals-dark: var(--activity-tempo-dark);
+
+  /* strength – sky */
+  --activity-strength: #0ea5e9;
+  --activity-strength-light: #f0f9ff;
+  --activity-strength-dark: #0369a1;
+
+  /* mobility – purple */
+  --activity-mobility: #a855f7;
+  --activity-mobility-light: #faf5ff;
+  --activity-mobility-dark: #7e22ce;
+
+  /* rest – slate */
+  --activity-rest: #64748b;
+  --activity-rest-light: #f8fafc;
+  --activity-rest-dark: #334155;
+
+  /* race – rose */
+  --activity-race: #f43f5e;
+  --activity-race-light: #fff1f2;
+  --activity-race-dark: #be123c;
+
+  /* indikátor shody planned vs. actual */
+  --match-good: #22c55e;
+  --match-partial: #eab308;
+  --match-miss: #ef4444;
+}
+
+/* ── klus / longrun (emerald) ── */
+.activity-klus,
+.activity-longrun {
+  --activity-color: var(--activity-klus);
+  --activity-bg: var(--activity-klus-light);
+  --activity-text: var(--activity-klus-dark);
+}
+
+.activity-klus-bg,
+.activity-longrun-bg {
+  background-color: var(--activity-klus-light);
+}
+
+.activity-klus-text,
+.activity-longrun-text {
+  color: var(--activity-klus-dark);
+}
+
+.activity-klus-border,
+.activity-longrun-border {
+  border-color: var(--activity-klus);
+}
+
+.activity-klus-indicator,
+.activity-longrun-indicator {
+  background-color: var(--activity-klus);
+}
+
+/* ── tempo / intervals (amber) ── */
+.activity-tempo,
+.activity-intervals {
+  --activity-color: var(--activity-tempo);
+  --activity-bg: var(--activity-tempo-light);
+  --activity-text: var(--activity-tempo-dark);
+}
+
+.activity-tempo-bg,
+.activity-intervals-bg {
+  background-color: var(--activity-tempo-light);
+}
+
+.activity-tempo-text,
+.activity-intervals-text {
+  color: var(--activity-tempo-dark);
+}
+
+.activity-tempo-border,
+.activity-intervals-border {
+  border-color: var(--activity-tempo);
+}
+
+.activity-tempo-indicator,
+.activity-intervals-indicator {
+  background-color: var(--activity-tempo);
+}
+
+/* ── strength (sky) ── */
+.activity-strength {
+  --activity-color: var(--activity-strength);
+  --activity-bg: var(--activity-strength-light);
+  --activity-text: var(--activity-strength-dark);
+}
+
+.activity-strength-bg {
+  background-color: var(--activity-strength-light);
+}
+
+.activity-strength-text {
+  color: var(--activity-strength-dark);
+}
+
+.activity-strength-border {
+  border-color: var(--activity-strength);
+}
+
+.activity-strength-indicator {
+  background-color: var(--activity-strength);
+}
+
+/* ── mobility (purple) ── */
+.activity-mobility {
+  --activity-color: var(--activity-mobility);
+  --activity-bg: var(--activity-mobility-light);
+  --activity-text: var(--activity-mobility-dark);
+}
+
+.activity-mobility-bg {
+  background-color: var(--activity-mobility-light);
+}
+
+.activity-mobility-text {
+  color: var(--activity-mobility-dark);
+}
+
+.activity-mobility-border {
+  border-color: var(--activity-mobility);
+}
+
+.activity-mobility-indicator {
+  background-color: var(--activity-mobility);
+}
+
+/* ── rest (slate) ── */
+.activity-rest {
+  --activity-color: var(--activity-rest);
+  --activity-bg: var(--activity-rest-light);
+  --activity-text: var(--activity-rest-dark);
+}
+
+.activity-rest-bg {
+  background-color: var(--activity-rest-light);
+}
+
+.activity-rest-text {
+  color: var(--activity-rest-dark);
+}
+
+.activity-rest-border {
+  border-color: var(--activity-rest);
+}
+
+.activity-rest-indicator {
+  background-color: var(--activity-rest);
+}
+
+/* ── race (rose) ── */
+.activity-race {
+  --activity-color: var(--activity-race);
+  --activity-bg: var(--activity-race-light);
+  --activity-text: var(--activity-race-dark);
+}
+
+.activity-race-bg {
+  background-color: var(--activity-race-light);
+}
+
+.activity-race-text {
+  color: var(--activity-race-dark);
+}
+
+.activity-race-border {
+  border-color: var(--activity-race);
+}
+
+.activity-race-indicator {
+  background-color: var(--activity-race);
+}
+
+/* ── indikátor shody planned vs. actual ── */
+.match-good-bg {
+  background-color: color-mix(in srgb, var(--match-good) 15%, white);
+}
+
+.match-good-text {
+  color: #15803d;
+}
+
+.match-good-border {
+  border-color: var(--match-good);
+}
+
+.match-good-dot {
+  background-color: var(--match-good);
+}
+
+.match-partial-bg {
+  background-color: color-mix(in srgb, var(--match-partial) 15%, white);
+}
+
+.match-partial-text {
+  color: #a16207;
+}
+
+.match-partial-border {
+  border-color: var(--match-partial);
+}
+
+.match-partial-dot {
+  background-color: var(--match-partial);
+}
+
+.match-miss-bg {
+  background-color: color-mix(in srgb, var(--match-miss) 15%, white);
+}
+
+.match-miss-text {
+  color: #b91c1c;
+}
+
+.match-miss-border {
+  border-color: var(--match-miss);
+}
+
+.match-miss-dot {
+  background-color: var(--match-miss);
+}

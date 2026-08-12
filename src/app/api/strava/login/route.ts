@@ -1,17 +1,22 @@
 import { NextResponse } from 'next/server';
 
-import { resolveStravaClientId } from '@/lib/resolveApiKeys';
-import { getStravaAuthorizationUrl } from '@/lib/strava';
+import {
+  getStravaClientIdFromEnv,
+  getStravaRedirectUriFromEnv,
+} from '@/lib/strava/env';
 
-/** Zahájí Strava OAuth2 flow – přesměruje na autorizační stránku Stravy */
+const STRAVA_AUTHORIZE_URL = 'https://www.strava.com/oauth/authorize';
+
+/** Zahájí Strava OAuth2 flow – přesměruje na oficiální přihlašovací stránku Stravy. */
 export async function GET(request: Request) {
-  const clientId = resolveStravaClientId(request);
+  const clientId = getStravaClientIdFromEnv();
+  const redirectUri = getStravaRedirectUriFromEnv();
 
   if (!clientId) {
     return NextResponse.json(
       {
         error:
-          'Strava client_id není nakonfigurován. Nastav STRAVA_CLIENT_ID v .env.local nebo předej client_id jako query parametr.',
+          'Strava client_id není nakonfigurován. Nastav STRAVA_CLIENT_ID ve Vercel Environment Variables.',
       },
       { status: 503 },
     );
@@ -19,10 +24,27 @@ export async function GET(request: Request) {
 
   const url = new URL(request.url);
   const returnTo = url.searchParams.get('returnTo') ?? '/settings?strava=connected';
-  const userId = url.searchParams.get('userId') ?? request.headers.get('cookie')?.match(/ai_coach_user_id=([^;]+)/)?.[1];
+  const userId =
+    url.searchParams.get('userId') ??
+    request.headers.get('cookie')?.match(/ai_coach_user_id=([^;]+)/)?.[1];
 
-  const state = Buffer.from(JSON.stringify({ returnTo, userId: userId ? decodeURIComponent(userId) : undefined })).toString('base64url');
-  const authUrl = getStravaAuthorizationUrl(state, { clientId });
+  const state = Buffer.from(
+    JSON.stringify({
+      returnTo,
+      userId: userId ? decodeURIComponent(userId) : undefined,
+    }),
+  ).toString('base64url');
 
-  return NextResponse.redirect(authUrl);
+  const params = new URLSearchParams({
+    client_id: clientId,
+    redirect_uri: redirectUri,
+    response_type: 'code',
+    approval_prompt: 'auto',
+    scope: 'read,activity:read_all',
+    state,
+  });
+
+  const stravaAuthUrl = `${STRAVA_AUTHORIZE_URL}?${params.toString()}`;
+
+  return NextResponse.redirect(stravaAuthUrl);
 }

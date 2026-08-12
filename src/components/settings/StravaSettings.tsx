@@ -8,9 +8,9 @@ import { useTrainingStore } from '@/store/useTrainingStore';
 
 const STRAVA_RETURN_TO = encodeURIComponent('/settings?strava=connected');
 
-function buildStravaLoginUrl(): string {
+function startStravaOAuth(): void {
   const userId = encodeURIComponent(getOrCreateUserId());
-  return `/api/strava/login?returnTo=${STRAVA_RETURN_TO}&userId=${userId}`;
+  window.location.href = `/api/strava/login?returnTo=${STRAVA_RETURN_TO}&userId=${userId}`;
 }
 
 export function StravaSettings({ active }: { active: boolean }) {
@@ -57,12 +57,13 @@ export function StravaSettings({ active }: { active: boolean }) {
 
         <div className="mt-5">
           {!stravaConnected ? (
-            <a
-              href={buildStravaLoginUrl()}
+            <button
+              type="button"
+              onClick={startStravaOAuth}
               className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#FC4C02] px-6 py-4 text-base font-semibold text-white shadow-sm transition-colors hover:bg-[#e04400]"
             >
               🟧 Připojit účet Strava
-            </a>
+            </button>
           ) : (
             <div className="flex flex-col gap-3">
               <p className="text-xs text-slate-500">

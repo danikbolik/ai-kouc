@@ -1,6 +1,10 @@
 import { cookies } from 'next/headers';
 
 import { resolveStravaCredentials } from '@/lib/resolveApiKeys';
+import {
+  getStravaClientIdFromEnv,
+  getStravaClientSecretFromEnv,
+} from '@/lib/strava/env';
 
 /** Resolve Strava credentials: headers → cookies → env */
 export async function resolveStravaCredentialsWithCookies(
@@ -13,9 +17,9 @@ export async function resolveStravaCredentialsWithCookies(
 
   const cookieStore = await cookies();
   return {
-    clientId: cookieStore.get('strava_client_id')?.value || process.env.STRAVA_CLIENT_ID,
+    clientId: cookieStore.get('strava_client_id')?.value || getStravaClientIdFromEnv(),
     clientSecret:
-      cookieStore.get('strava_client_secret')?.value || process.env.STRAVA_CLIENT_SECRET,
+      cookieStore.get('strava_client_secret')?.value || getStravaClientSecretFromEnv(),
   };
 }
 

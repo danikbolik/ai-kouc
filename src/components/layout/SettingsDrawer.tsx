@@ -7,13 +7,13 @@ import {
   isSupportedMethodologyFile,
   readMethodologyFile,
 } from '../../lib/readMethodologyFile';
-import { buildApiKeyHeaders } from '../../lib/apiKeyHeaders';
 import { getOrCreateUserId } from '../../lib/userId';
 import {
   DEFAULT_PACE_ZONES,
   type PaceZone,
 } from '../../types/settings';
 import { CoachNotesPanel } from '../settings/CoachNotesPanel';
+import { StravaSettings } from '../settings/StravaSettings';
 import { useTrainingStore } from '../../store/useTrainingStore';
 
 type SettingsSection = 'personal' | 'methodology' | 'memory' | 'strava' | 'integrations';
@@ -25,13 +25,6 @@ const SECTIONS: { id: SettingsSection; label: string }[] = [
   { id: 'strava', label: 'Strava Integrace' },
   { id: 'integrations', label: 'Integrace / API' },
 ];
-
-const STRAVA_RETURN_TO = encodeURIComponent('/settings?strava=connected');
-
-function buildStravaLoginUrl(): string {
-  const userId = encodeURIComponent(getOrCreateUserId());
-  return `/api/strava/login?returnTo=${STRAVA_RETURN_TO}&userId=${userId}`;
-}
 
 function KeyStatus({ configured }: { configured: boolean }) {
   return (
@@ -49,11 +42,6 @@ function KeyStatus({ configured }: { configured: boolean }) {
 export function SettingsDrawer() {
   const isSettingsOpen = useTrainingStore((s) => s.isSettingsOpen);
   const setSettingsOpen = useTrainingStore((s) => s.setSettingsOpen);
-  const stravaConnected = useTrainingStore((s) => s.stravaConnected);
-  const isStravaSyncing = useTrainingStore((s) => s.isStravaSyncing);
-  const setStravaConnected = useTrainingStore((s) => s.setStravaConnected);
-  const syncStravaActivities = useTrainingStore((s) => s.syncStravaActivities);
-  const disconnectStrava = useTrainingStore((s) => s.disconnectStrava);
   const storedApiKeys = useTrainingStore((s) => s.apiKeys);
   const setApiKeys = useTrainingStore((s) => s.setApiKeys);
   const storedUserMetrics = useTrainingStore((s) => s.userMetrics);
@@ -78,7 +66,6 @@ export function SettingsDrawer() {
 
   const [openaiApiKey, setOpenaiApiKey] = useState('');
   const [showOpenAiKey, setShowOpenAiKey] = useState(false);
-  const [stravaOAuthConfigured, setStravaOAuthConfigured] = useState(false);
   const [saveFeedback, setSaveFeedback] = useState<string | null>(null);
   const [metricsSaveFeedback, setMetricsSaveFeedback] = useState<string | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
@@ -104,19 +91,6 @@ export function SettingsDrawer() {
   useEffect(() => {
     if (!isSettingsOpen) return;
 
-    fetch('/api/strava/sync', {
-      headers: buildApiKeyHeaders(storedApiKeys),
-    })
-      .then((res) => res.json())
-      .then((data: { connected: boolean; configured?: boolean }) => {
-        setStravaConnected(data.connected);
-        setStravaOAuthConfigured(data.configured ?? false);
-      })
-      .catch(() => {
-        setStravaConnected(false);
-        setStravaOAuthConfigured(false);
-      });
-
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') setSettingsOpen(false);
     };
@@ -128,7 +102,7 @@ export function SettingsDrawer() {
       document.body.style.overflow = '';
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [isSettingsOpen, setSettingsOpen, setStravaConnected]);
+  }, [isSettingsOpen, setSettingsOpen]);
 
   const handleSaveApiKeys = () => {
     setApiKeys({
@@ -481,23 +455,7 @@ export function SettingsDrawer() {
           {activeSection === 'memory' && <CoachNotesPanel />}
 
           {activeSection === 'strava' && (
-            <section className="space-y-4">
-              <div>
-                <h3 className="text-sm font-semibold text-slate-900">Strava Integrace</h3>
-                <p className="mt-1 text-xs text-slate-500">
-                  Oficiální OAuth2 přihlášení na jeden klik. Synchronizace stáhne kompletní historii
-                  běhů ze Stravy (paginace po 200 aktivitách) a doplní je do kalendáře.
-                </p>
-              </div>
-
-              <StravaIntegration
-                connected={stravaConnected}
-                isSyncing={isStravaSyncing}
-                oauthConfigured={stravaOAuthConfigured}
-                onSync={syncStravaActivities}
-                onDisconnect={disconnectStrava}
-              />
-            </section>
+            <StravaSettings active={isSettingsOpen && activeSection === 'strava'} />
           )}
 
           {activeSection === 'integrations' && (
@@ -560,92 +518,6 @@ export function SettingsDrawer() {
           )}
         </div>
       </aside>
-    </div>
-  );
-}
-
-function StravaIntegration({
-  connected,
-  isSyncing,
-  oauthConfigured,
-  onSync,
-  onDisconnect,
-}: {
-  connected: boolean;
-  isSyncing: boolean;
-  oauthConfigured: boolean;
-  onSync: () => void;
-  onDisconnect: () => void;
-}) {
-  return (
-    <div className="rounded-xl border border-slate-200 bg-white px-4 py-5">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="text-sm font-medium text-slate-900">Strava</p>
-          <p className="text-xs text-slate-500">Synchronizace běžeckých aktivit přes OAuth2</p>
-          <span
-            className={[
-              'mt-2 inline-flex items-center gap-1 text-sm font-medium',
-              connected ? 'text-emerald-600' : 'text-slate-500',
-            ].join(' ')}
-          >
-            {connected ? '🟢 Připojeno' : '⚪ Nepřipojeno'}
-          </span>
-        </div>
-        <span className="text-2xl" aria-hidden="true">
-          🟧
-        </span>
-      </div>
-
-      <div className="mt-5">
-        {!connected ? (
-          oauthConfigured ? (
-            <a
-              href={buildStravaLoginUrl()}
-              className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#FC4C02] px-6 py-4 text-base font-semibold text-white shadow-sm transition-colors hover:bg-[#e04400]"
-            >
-              🟧 Připojit účet Strava
-            </a>
-          ) : (
-            <button
-              type="button"
-              disabled
-              className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#FC4C02] px-6 py-4 text-base font-semibold text-white opacity-50"
-            >
-              🟧 Připojit účet Strava
-            </button>
-          )
-        ) : (
-          <div className="flex flex-col gap-3">
-            <p className="text-xs text-slate-500">
-              Synchronizovat kompletní historii běhů — vzdálenost, čas, tempo a tepy se zapíší do
-              kalendáře.
-            </p>
-            <button
-              type="button"
-              onClick={() => onSync()}
-              disabled={isSyncing}
-              className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-6 py-4 text-base font-semibold text-white transition-colors hover:bg-emerald-700 disabled:opacity-60"
-            >
-              {isSyncing ? 'Synchronizuji historii…' : '🔄 Synchronizovat kompletní historii'}
-            </button>
-            <button
-              type="button"
-              onClick={onDisconnect}
-              className="rounded-lg border border-slate-200 px-4 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50"
-            >
-              Odpojit účet
-            </button>
-          </div>
-        )}
-      </div>
-
-      {!oauthConfigured && !connected && (
-        <p className="mt-3 text-xs text-red-500">
-          Strava OAuth není nakonfigurována. Nastav STRAVA_CLIENT_ID a STRAVA_CLIENT_SECRET v
-          .env.local.
-        </p>
-      )}
     </div>
   );
 }

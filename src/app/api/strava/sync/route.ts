@@ -6,21 +6,14 @@ import {
   fetchAllActivities,
   isStravaConfigured,
 } from '@/lib/strava';
-import { getValidStravaAccessToken } from '@/lib/strava/tokenAccess';
+import { getValidStravaAccessToken, hasStravaConnection } from '@/lib/strava/tokenAccess';
 import { resolveStravaCredentialsWithCookies } from '@/lib/stravaCredentials';
 
 export async function GET(request: Request) {
-  const cookieStore = await cookies();
-  const credentials = {
-    clientId: process.env.STRAVA_CLIENT_ID,
-    clientSecret: process.env.STRAVA_CLIENT_SECRET,
-  };
-
-  const accessToken = await getValidStravaAccessToken(request, credentials);
-  const cookieConnected = cookieStore.get('strava_connected')?.value === 'true';
+  const credentials = await resolveStravaCredentialsWithCookies(request);
 
   return NextResponse.json({
-    connected: Boolean(accessToken) || cookieConnected,
+    connected: await hasStravaConnection(request),
     configured: isStravaConfigured(credentials),
     fullHistory: true,
   });

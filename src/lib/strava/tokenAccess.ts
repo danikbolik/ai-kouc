@@ -8,6 +8,25 @@ interface StravaCredentials {
   clientSecret?: string;
 }
 
+/** Lehká kontrola připojení bez refresh tokenu (pro status endpoint). */
+export async function hasStravaConnection(request: Request): Promise<boolean> {
+  const cookieStore = await cookies();
+
+  if (cookieStore.get('strava_access_token')?.value) return true;
+  if (cookieStore.get('strava_refresh_token')?.value) return true;
+  if (cookieStore.get('strava_connected')?.value === 'true') return true;
+
+  const userId = request.headers.get('x-user-id');
+  if (isValidUserId(userId)) {
+    const cloud = await getUserData(userId);
+    if (cloud?.stravaTokens?.accessToken || cloud?.stravaTokens?.refreshToken) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 export async function getValidStravaAccessToken(
   request: Request,
   credentials: StravaCredentials,

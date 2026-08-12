@@ -6,6 +6,12 @@ import type {
   WorkoutSession,
 } from '@/types/training';
 
+import {
+  getStravaClientIdFromEnv,
+  getStravaClientSecretFromEnv,
+  getStravaRedirectUriFromEnv,
+} from './strava/env';
+
 const STRAVA_API_BASE = 'https://www.strava.com/api/v3';
 const STRAVA_OAUTH_BASE = 'https://www.strava.com/oauth';
 
@@ -49,11 +55,9 @@ export function getStravaConfig(credentials?: {
   clientId?: string;
   clientSecret?: string;
 }) {
-  const clientId = credentials?.clientId || process.env.STRAVA_CLIENT_ID;
-  const clientSecret = credentials?.clientSecret || process.env.STRAVA_CLIENT_SECRET;
-  const redirectUri =
-    process.env.STRAVA_REDIRECT_URI ??
-    `${process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'}/api/strava/callback`;
+  const clientId = credentials?.clientId || getStravaClientIdFromEnv();
+  const clientSecret = credentials?.clientSecret || getStravaClientSecretFromEnv();
+  const redirectUri = getStravaRedirectUriFromEnv();
 
   return { clientId, clientSecret, redirectUri };
 }

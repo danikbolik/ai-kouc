@@ -1,4 +1,8 @@
 import type { ApiKeys } from '@/lib/apiKeyHeaders';
+import {
+  getStravaClientIdFromEnv,
+  getStravaClientSecretFromEnv,
+} from '@/lib/strava/env';
 
 const PLACEHOLDER_KEY_PATTERNS = [
   /^your[_-]?key/i,
@@ -32,7 +36,7 @@ export function resolveStravaClientId(request: Request): string | undefined {
   return (
     url.searchParams.get('client_id')?.trim() ||
     request.headers.get('x-strava-client-id')?.trim() ||
-    process.env.STRAVA_CLIENT_ID
+    getStravaClientIdFromEnv()
   );
 }
 
@@ -41,18 +45,17 @@ export function resolveStravaCredentials(request: Request): {
   clientSecret?: string;
 } {
   const clientId =
-    request.headers.get('x-strava-client-id')?.trim() || process.env.STRAVA_CLIENT_ID;
+    request.headers.get('x-strava-client-id')?.trim() || getStravaClientIdFromEnv();
   const clientSecret =
-    request.headers.get('x-strava-client-secret')?.trim() ||
-    process.env.STRAVA_CLIENT_SECRET;
+    request.headers.get('x-strava-client-secret')?.trim() || getStravaClientSecretFromEnv();
 
   return { clientId, clientSecret };
 }
 
 export function resolveStravaCredentialsFromKeys(keys: ApiKeys) {
   return {
-    clientId: keys.stravaClientId.trim() || process.env.STRAVA_CLIENT_ID,
-    clientSecret: keys.stravaClientSecret.trim() || process.env.STRAVA_CLIENT_SECRET,
+    clientId: keys.stravaClientId.trim() || getStravaClientIdFromEnv(),
+    clientSecret: keys.stravaClientSecret.trim() || getStravaClientSecretFromEnv(),
   };
 }
 

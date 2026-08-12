@@ -97,22 +97,26 @@ export function getStravaAuthorizationUrl(
 export async function exchangeStravaCode(
   code: string,
   credentials?: { clientId?: string; clientSecret?: string },
+  redirectUriOverride?: string,
 ): Promise<StravaTokenResponse> {
   const { clientId, clientSecret, redirectUri } = getStravaConfig(credentials);
+  const redirect_uri = redirectUriOverride ?? redirectUri;
   if (!clientId || !clientSecret) {
     throw new Error('Strava credentials are not configured');
   }
 
+  const body = new URLSearchParams({
+    client_id: clientId,
+    client_secret: clientSecret,
+    code,
+    grant_type: 'authorization_code',
+    redirect_uri,
+  });
+
   const response = await fetch(`${STRAVA_OAUTH_BASE}/token`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      client_id: clientId,
-      client_secret: clientSecret,
-      code,
-      grant_type: 'authorization_code',
-      redirect_uri: redirectUri,
-    }),
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: body.toString(),
   });
 
   if (!response.ok) {
@@ -133,19 +137,22 @@ export async function refreshStravaToken(
     throw new Error('Strava credentials are not configured');
   }
 
+  const body = new URLSearchParams({
+    client_id: clientId,
+    client_secret: clientSecret,
+    refresh_token: refreshToken,
+    grant_type: 'refresh_token',
+  });
+
   const response = await fetch(`${STRAVA_OAUTH_BASE}/token`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      client_id: clientId,
-      client_secret: clientSecret,
-      refresh_token: refreshToken,
-      grant_type: 'refresh_token',
-    }),
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: body.toString(),
   });
 
   if (!response.ok) {
-    throw new Error('Strava token refresh failed');
+    const error = await response.text();
+    throw new Error(`Strava token refresh failed: ${error}`);
   }
 
   return response.json() as Promise<StravaTokenResponse>;

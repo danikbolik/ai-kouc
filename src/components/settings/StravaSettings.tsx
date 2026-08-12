@@ -6,24 +6,24 @@ import { useStravaStatus } from '@/hooks/useStravaStatus';
 import { getOrCreateUserId } from '@/lib/userId';
 import { useTrainingStore } from '@/store/useTrainingStore';
 
-const STRAVA_RETURN_TO = encodeURIComponent('/settings?strava=connected');
-
 function startStravaOAuth(): void {
   const userId = encodeURIComponent(getOrCreateUserId());
-  window.location.href = `/api/strava/login?returnTo=${STRAVA_RETURN_TO}&userId=${userId}`;
+  window.location.href = `/api/strava/login?userId=${userId}`;
 }
 
 export function StravaSettings({ active }: { active: boolean }) {
   const stravaConnected = useTrainingStore((s) => s.stravaConnected);
   const isStravaSyncing = useTrainingStore((s) => s.isStravaSyncing);
+  const stravaError = useTrainingStore((s) => s.stravaError);
   const setStravaConnected = useTrainingStore((s) => s.setStravaConnected);
+  const setStravaError = useTrainingStore((s) => s.setStravaError);
   const syncStravaActivities = useTrainingStore((s) => s.syncStravaActivities);
   const disconnectStrava = useTrainingStore((s) => s.disconnectStrava);
 
   const { connected } = useStravaStatus(active);
 
   useEffect(() => {
-    setStravaConnected(connected);
+    if (connected) setStravaConnected(true);
   }, [connected, setStravaConnected]);
 
   return (
@@ -90,6 +90,10 @@ export function StravaSettings({ active }: { active: boolean }) {
             </div>
           )}
         </div>
+
+        {stravaError && (
+          <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">{stravaError}</p>
+        )}
       </div>
     </section>
   );

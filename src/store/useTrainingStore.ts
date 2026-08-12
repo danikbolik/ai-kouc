@@ -55,6 +55,7 @@ interface TrainingState {
   isRecalculating: boolean;
   stravaConnected: boolean;
   isStravaSyncing: boolean;
+  stravaError: string | null;
   calendarRevision: number;
   calendarAnchorDate: string;
   currentView: CalendarView;
@@ -86,6 +87,7 @@ interface TrainingActions {
   updateFeedback: (date: string, feedback: Partial<DayData['feedback']>) => void;
   recalculatePlan: (fromDate: string) => Promise<void>;
   setStravaConnected: (connected: boolean) => void;
+  setStravaError: (error: string | null) => void;
   syncStravaActivities: () => Promise<void>;
   disconnectStrava: () => Promise<void>;
   setApiKeys: (keys: Partial<ApiKeys>) => void;
@@ -127,6 +129,7 @@ export const useTrainingStore = create<TrainingState & TrainingActions>()(
       isRecalculating: false,
       stravaConnected: false,
       isStravaSyncing: false,
+      stravaError: null,
       calendarRevision: 0,
       calendarAnchorDate: getTodayDate(),
       currentView: 'month',
@@ -393,6 +396,8 @@ export const useTrainingStore = create<TrainingState & TrainingActions>()(
 
       setStravaConnected: (connected) => set({ stravaConnected: connected }),
 
+      setStravaError: (error) => set({ stravaError: error }),
+
       connectStrava: () => {
         const returnTo = encodeURIComponent('/settings?strava=connected');
         window.location.href = `/api/strava/login?returnTo=${returnTo}`;
@@ -400,7 +405,7 @@ export const useTrainingStore = create<TrainingState & TrainingActions>()(
 
       syncStravaActivities: async () => {
         if (get().isStravaSyncing) return;
-        set({ isStravaSyncing: true });
+        set({ isStravaSyncing: true, stravaError: null });
 
         try {
           const response = await fetch('/api/strava/sync', {
@@ -409,7 +414,10 @@ export const useTrainingStore = create<TrainingState & TrainingActions>()(
             body: JSON.stringify({}),
           });
 
-          if (!response.ok) throw new Error(`Strava sync failed: ${response.status}`);
+          if (!response.ok) {
+            const body = (await response.json().catch(() => ({}))) as { error?: string };
+            throw new Error(body.error ?? `Strava sync failed (${response.status})`);
+          }
 
           const data = (await response.json()) as {
             activitiesCount: number;
@@ -431,12 +439,17 @@ export const useTrainingStore = create<TrainingState & TrainingActions>()(
               days: updatedDays,
               stravaConnected: true,
               isStravaSyncing: false,
+              stravaError: null,
               calendarRevision: state.calendarRevision + 1,
             };
           });
         } catch (error) {
           console.error('[syncStravaActivities]', error);
-          set({ isStravaSyncing: false });
+          set({
+            isStravaSyncing: false,
+            stravaError:
+              error instanceof Error ? error.message : 'Synchronizace se Stravou selhala.',
+          });
         }
       },
 

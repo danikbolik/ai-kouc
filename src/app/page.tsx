@@ -11,6 +11,7 @@ import { useTrainingStore } from '../store/useTrainingStore';
 export default function HomePage() {
   const activeTab = useTrainingStore((s) => s.activeTab);
   const setStravaConnected = useTrainingStore((s) => s.setStravaConnected);
+  const setStravaError = useTrainingStore((s) => s.setStravaError);
   const syncStravaActivities = useTrainingStore((s) => s.syncStravaActivities);
   const setSettingsOpen = useTrainingStore((s) => s.setSettingsOpen);
 
@@ -21,13 +22,25 @@ export default function HomePage() {
     if (stravaStatus === 'connected') {
       setStravaConnected(true);
       setSettingsOpen(true);
-      void syncStravaActivities();
+
+      const runSync = () => void syncStravaActivities();
+      window.setTimeout(runSync, 500);
 
       params.delete('strava');
       const newUrl = `${window.location.pathname}${params.toString() ? `?${params}` : ''}`;
       window.history.replaceState({}, '', newUrl);
     }
-  }, [setStravaConnected, syncStravaActivities, setSettingsOpen]);
+
+    if (stravaStatus === 'error') {
+      const reason = params.get('reason') ?? 'unknown';
+      setStravaError(decodeURIComponent(reason));
+      setSettingsOpen(true);
+      params.delete('strava');
+      params.delete('reason');
+      const newUrl = `${window.location.pathname}${params.toString() ? `?${params}` : ''}`;
+      window.history.replaceState({}, '', newUrl);
+    }
+  }, [setStravaConnected, setStravaError, syncStravaActivities, setSettingsOpen]);
 
   return (
     <div className="flex min-h-screen flex-col bg-slate-50">

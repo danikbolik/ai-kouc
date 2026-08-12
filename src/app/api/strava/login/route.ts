@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 
 import {
   getStravaClientIdFromEnv,
-  getStravaRedirectUriFromEnv,
+  getStravaRedirectUriForRequest,
 } from '@/lib/strava/env';
 
 const STRAVA_AUTHORIZE_URL = 'https://www.strava.com/oauth/authorize';
@@ -10,7 +10,7 @@ const STRAVA_AUTHORIZE_URL = 'https://www.strava.com/oauth/authorize';
 /** Zahájí Strava OAuth2 flow – přesměruje na oficiální přihlašovací stránku Stravy. */
 export async function GET(request: Request) {
   const clientId = getStravaClientIdFromEnv();
-  const redirectUri = getStravaRedirectUriFromEnv();
+  const redirectUri = getStravaRedirectUriForRequest(request);
 
   if (!clientId) {
     return NextResponse.json(
@@ -30,6 +30,7 @@ export async function GET(request: Request) {
   const state = Buffer.from(
     JSON.stringify({
       userId: userId ? decodeURIComponent(userId) : undefined,
+      redirectUri,
     }),
   ).toString('base64url');
 
@@ -42,7 +43,5 @@ export async function GET(request: Request) {
     state,
   });
 
-  const stravaAuthUrl = `${STRAVA_AUTHORIZE_URL}?${params.toString()}`;
-
-  return NextResponse.redirect(stravaAuthUrl);
+  return NextResponse.redirect(`${STRAVA_AUTHORIZE_URL}?${params.toString()}`);
 }

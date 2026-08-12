@@ -6,9 +6,10 @@ import {
   type StravaTokenResponse,
 } from '@/lib/strava';
 import {
-  getAppBaseUrlFromEnv,
+  getAppBaseUrlFromRequest,
   getStravaClientIdFromEnv,
   getStravaClientSecretFromEnv,
+  getStravaRedirectUriForRequest,
 } from '@/lib/strava/env';
 import { isValidUserId, saveStravaTokensForUser } from '@/lib/userData/repository';
 
@@ -22,7 +23,7 @@ const COOKIE_OPTIONS = {
 function setStravaTokenCookies(response: NextResponse, tokens: StravaTokenResponse) {
   response.cookies.set('strava_access_token', tokens.access_token, {
     ...COOKIE_OPTIONS,
-    maxAge: tokens.expires_in,
+    maxAge: Math.max(tokens.expires_in, 3600),
   });
   response.cookies.set('strava_refresh_token', tokens.refresh_token, {
     ...COOKIE_OPTIONS,
@@ -30,7 +31,7 @@ function setStravaTokenCookies(response: NextResponse, tokens: StravaTokenRespon
   });
   response.cookies.set('strava_expires_at', String(tokens.expires_at), {
     ...COOKIE_OPTIONS,
-    maxAge: tokens.expires_in,
+    maxAge: 60 * 60 * 24 * 30,
   });
   response.cookies.set('strava_connected', 'true', {
     ...COOKIE_OPTIONS,
@@ -39,18 +40,34 @@ function setStravaTokenCookies(response: NextResponse, tokens: StravaTokenRespon
   });
 }
 
-function parseUserIdFromState(stateParam: string | null, request: Request): string | undefined {
+function parseOAuthState(
+  stateParam: string | null,
+  request: Request,
+): { userId?: string; redirectUri: string } {
+  const fallbackRedirectUri = getStravaRedirectUriForRequest(request);
+
   if (stateParam) {
     try {
       const state = JSON.parse(Buffer.from(stateParam, 'base64url').toString()) as {
         userId?: string;
+        redirectUri?: string;
       };
-      if (isValidUserId(state.userId)) return state.userId;
+      return {
+        userId: isValidUserId(state.userId) ? state.userId : parseUserIdFromCookie(request),
+        redirectUri: state.redirectUri ?? fallbackRedirectUri,
+      };
     } catch {
       // ignore invalid state
     }
   }
 
+  return {
+    userId: parseUserIdFromCookie(request),
+    redirectUri: fallbackRedirectUri,
+  };
+}
+
+function parseUserIdFromCookie(request: Request): string | undefined {
   const cookieMatch = request.headers.get('cookie')?.match(/ai_coach_user_id=([^;]+)/)?.[1];
   const cookieUserId = cookieMatch ? decodeURIComponent(cookieMatch) : undefined;
   return isValidUserId(cookieUserId) ? cookieUserId : undefined;
@@ -62,11 +79,10 @@ export async function GET(request: Request) {
     clientId: getStravaClientIdFromEnv(),
     clientSecret: getStravaClientSecretFromEnv(),
   };
+  const appBase = getAppBaseUrlFromRequest(request);
 
   if (!isStravaConfigured(credentials)) {
-    return NextResponse.redirect(
-      new URL('/?strava=error&reason=config', getAppBaseUrlFromEnv()),
-    );
+    return NextResponse.redirect(new URL('/?strava=error&reason=config', appBase));
   }
 
   const url = new URL(request.url);
@@ -76,44 +92,47 @@ export async function GET(request: Request) {
 
   if (error) {
     return NextResponse.redirect(
-      new URL(`/?strava=error&reason=${encodeURIComponent(error)}`, getAppBaseUrlFromEnv()),
+      new URL(`/?strava=error&reason=${encodeURIComponent(error)}`, appBase),
     );
   }
 
   if (!code) {
-    return NextResponse.redirect(
-      new URL('/?strava=error&reason=no_code', getAppBaseUrlFromEnv()),
-    );
+    return NextResponse.redirect(new URL('/?strava=error&reason=no_code', appBase));
   }
 
-  try {
-    const tokens = await exchangeStravaCode(code, credentials);
-    const userId = parseUserIdFromState(stateParam, request);
+  const { userId, redirectUri } = parseOAuthState(stateParam, request);
 
-    const redirectUrl = new URL('/', getAppBaseUrlFromEnv());
+  try {
+    const tokens = await exchangeStravaCode(code, credentials, redirectUri);
+
+    const redirectUrl = new URL('/', appBase);
     redirectUrl.searchParams.set('strava', 'connected');
 
     const response = NextResponse.redirect(redirectUrl);
     setStravaTokenCookies(response, tokens);
 
     if (userId) {
-      await saveStravaTokensForUser(userId, {
-        accessToken: tokens.access_token,
-        refreshToken: tokens.refresh_token,
-        expiresAt: tokens.expires_at,
-        athleteId: tokens.athlete?.id,
-        athleteName: tokens.athlete
-          ? `${tokens.athlete.firstname} ${tokens.athlete.lastname}`.trim()
-          : undefined,
-      });
+      try {
+        await saveStravaTokensForUser(userId, {
+          accessToken: tokens.access_token,
+          refreshToken: tokens.refresh_token,
+          expiresAt: tokens.expires_at,
+          athleteId: tokens.athlete?.id,
+          athleteName: tokens.athlete
+            ? `${tokens.athlete.firstname} ${tokens.athlete.lastname}`.trim()
+            : undefined,
+        });
+      } catch (cloudError) {
+        console.error('[Strava callback] Cloud token save failed (cookies still set):', cloudError);
+      }
     }
 
     return response;
   } catch (err) {
     console.error('[Strava callback]', err);
-    return NextResponse.redirect(
-      new URL('/?strava=error&reason=token_exchange', getAppBaseUrlFromEnv()),
-    );
+    const reason =
+      err instanceof Error ? encodeURIComponent(err.message.slice(0, 120)) : 'token_exchange';
+    return NextResponse.redirect(new URL(`/?strava=error&reason=${reason}`, appBase));
   }
 }
 

@@ -107,7 +107,13 @@ export async function saveUserData(
 
 export async function saveStravaTokensForUser(
   userId: string,
-  tokens: { accessToken: string; refreshToken: string; expiresAt: number },
+  tokens: {
+    accessToken: string;
+    refreshToken: string;
+    expiresAt: number;
+    athleteId?: number;
+    athleteName?: string;
+  },
 ): Promise<void> {
   if (!isCloudDbConfigured() || !isValidUserId(userId)) return;
 

@@ -1,4 +1,3 @@
-import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 
 import {
@@ -6,8 +5,12 @@ import {
   isStravaConfigured,
   type StravaTokenResponse,
 } from '@/lib/strava';
-import { getUserData, isValidUserId, saveStravaTokensForUser } from '@/lib/userData/repository';
-import { resolveStravaCredentialsWithCookies } from '@/lib/stravaCredentials';
+import {
+  getAppBaseUrlFromEnv,
+  getStravaClientIdFromEnv,
+  getStravaClientSecretFromEnv,
+} from '@/lib/strava/env';
+import { isValidUserId, saveStravaTokensForUser } from '@/lib/userData/repository';
 
 const COOKIE_OPTIONS = {
   httpOnly: true,
@@ -36,11 +39,34 @@ function setStravaTokenCookies(response: NextResponse, tokens: StravaTokenRespon
   });
 }
 
+function parseUserIdFromState(stateParam: string | null, request: Request): string | undefined {
+  if (stateParam) {
+    try {
+      const state = JSON.parse(Buffer.from(stateParam, 'base64url').toString()) as {
+        userId?: string;
+      };
+      if (isValidUserId(state.userId)) return state.userId;
+    } catch {
+      // ignore invalid state
+    }
+  }
+
+  const cookieMatch = request.headers.get('cookie')?.match(/ai_coach_user_id=([^;]+)/)?.[1];
+  const cookieUserId = cookieMatch ? decodeURIComponent(cookieMatch) : undefined;
+  return isValidUserId(cookieUserId) ? cookieUserId : undefined;
+}
+
+/** Strava OAuth callback – vymění code za tokeny, uloží do Supabase a přesměruje do aplikace. */
 export async function GET(request: Request) {
-  const credentials = await resolveStravaCredentialsWithCookies(request);
+  const credentials = {
+    clientId: getStravaClientIdFromEnv(),
+    clientSecret: getStravaClientSecretFromEnv(),
+  };
 
   if (!isStravaConfigured(credentials)) {
-    return NextResponse.redirect(new URL('/?strava=error&reason=config', request.url));
+    return NextResponse.redirect(
+      new URL('/?strava=error&reason=config', getAppBaseUrlFromEnv()),
+    );
   }
 
   const url = new URL(request.url);
@@ -49,54 +75,49 @@ export async function GET(request: Request) {
   const stateParam = url.searchParams.get('state');
 
   if (error) {
-    return NextResponse.redirect(new URL(`/?strava=error&reason=${error}`, request.url));
+    return NextResponse.redirect(
+      new URL(`/?strava=error&reason=${encodeURIComponent(error)}`, getAppBaseUrlFromEnv()),
+    );
   }
 
   if (!code) {
-    return NextResponse.redirect(new URL('/?strava=error&reason=no_code', request.url));
+    return NextResponse.redirect(
+      new URL('/?strava=error&reason=no_code', getAppBaseUrlFromEnv()),
+    );
   }
 
   try {
     const tokens = await exchangeStravaCode(code, credentials);
+    const userId = parseUserIdFromState(stateParam, request);
 
-    let returnTo = '/settings?strava=connected';
-    let userId: string | undefined;
-    if (stateParam) {
-      try {
-        const state = JSON.parse(Buffer.from(stateParam, 'base64url').toString()) as {
-          returnTo?: string;
-          userId?: string;
-        };
-        returnTo = state.returnTo ?? '/settings?strava=connected';
-        userId = state.userId;
-      } catch {
-        // ignore invalid state
-      }
-    }
-
-    const redirectUrl = new URL(returnTo, request.url);
+    const redirectUrl = new URL('/', getAppBaseUrlFromEnv());
     redirectUrl.searchParams.set('strava', 'connected');
 
     const response = NextResponse.redirect(redirectUrl);
     setStravaTokenCookies(response, tokens);
 
-    if (isValidUserId(userId)) {
+    if (userId) {
       await saveStravaTokensForUser(userId, {
         accessToken: tokens.access_token,
         refreshToken: tokens.refresh_token,
         expiresAt: tokens.expires_at,
+        athleteId: tokens.athlete?.id,
+        athleteName: tokens.athlete
+          ? `${tokens.athlete.firstname} ${tokens.athlete.lastname}`.trim()
+          : undefined,
       });
     }
 
     return response;
   } catch (err) {
     console.error('[Strava callback]', err);
-    return NextResponse.redirect(new URL('/?strava=error&reason=token_exchange', request.url));
+    return NextResponse.redirect(
+      new URL('/?strava=error&reason=token_exchange', getAppBaseUrlFromEnv()),
+    );
   }
 }
 
 export async function DELETE() {
-  const cookieStore = await cookies();
   const response = NextResponse.json({ connected: false });
 
   for (const name of [
@@ -105,7 +126,6 @@ export async function DELETE() {
     'strava_expires_at',
     'strava_connected',
   ]) {
-    cookieStore.delete(name);
     response.cookies.set(name, '', { maxAge: 0, path: '/' });
   }
 

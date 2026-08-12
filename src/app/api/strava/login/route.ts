@@ -23,14 +23,12 @@ export async function GET(request: Request) {
   }
 
   const url = new URL(request.url);
-  const returnTo = url.searchParams.get('returnTo') ?? '/settings?strava=connected';
   const userId =
     url.searchParams.get('userId') ??
     request.headers.get('cookie')?.match(/ai_coach_user_id=([^;]+)/)?.[1];
 
   const state = Buffer.from(
     JSON.stringify({
-      returnTo,
       userId: userId ? decodeURIComponent(userId) : undefined,
     }),
   ).toString('base64url');

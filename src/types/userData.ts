@@ -7,6 +7,8 @@ export interface StravaTokensSnapshot {
   accessToken: string;
   refreshToken: string;
   expiresAt: number;
+  athleteId?: number;
+  athleteName?: string;
 }
 
 export interface UserDataSnapshot {

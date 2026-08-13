@@ -68,6 +68,9 @@ export function SettingsDrawer() {
   const [hrZones, setHrZones] = useState<HrZone[]>(
     storedUserMetrics.hrZones ?? DEFAULT_HR_ZONES,
   );
+  const [mesocycleStartDate, setMesocycleStartDate] = useState(
+    storedUserMetrics.mesocycleStartDate ?? '',
+  );
 
   const [openaiApiKey, setOpenaiApiKey] = useState('');
   const [showOpenAiKey, setShowOpenAiKey] = useState(false);
@@ -89,6 +92,7 @@ export function SettingsDrawer() {
     setRaceDistance(String(storedUserMetrics.raceDistanceKm ?? 21.1));
     setPaceZones(storedUserMetrics.paceZones ?? DEFAULT_PACE_ZONES);
     setHrZones(storedUserMetrics.hrZones ?? DEFAULT_HR_ZONES);
+    setMesocycleStartDate(storedUserMetrics.mesocycleStartDate ?? '');
     setMetricsSaveFeedback(null);
     setUploadError(null);
     setSaveFeedback(null);
@@ -128,6 +132,7 @@ export function SettingsDrawer() {
       raceDistanceKm: Number(raceDistance) || 21.1,
       paceZones,
       hrZones,
+      mesocycleStartDate: mesocycleStartDate || undefined,
     });
     setMetricsSaveFeedback('Parametry uloženy do prohlížeče.');
     setTimeout(() => setMetricsSaveFeedback(null), 3000);
@@ -416,6 +421,27 @@ export function SettingsDrawer() {
                     </div>
                   ))}
                 </div>
+              </div>
+
+              <div>
+                <h3 className="mb-3 text-sm font-semibold text-slate-900">
+                  Mesocyklus 3+1
+                </h3>
+                <p className="mb-3 text-xs text-slate-500">
+                  Týdny 1–3 = budování/nárůst, týden 4 = deload (−30–40 % objemu). Nastav pondělí
+                  startu aktuálního cyklu.
+                </p>
+                <label className="block">
+                  <span className="mb-1 block text-xs font-medium text-slate-600">
+                    Start mesocyklu (pondělí)
+                  </span>
+                  <input
+                    type="date"
+                    value={mesocycleStartDate}
+                    onChange={(e) => setMesocycleStartDate(e.target.value)}
+                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 outline-none ring-emerald-500 focus:ring-2"
+                  />
+                </label>
               </div>
 
               <button

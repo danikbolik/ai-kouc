@@ -415,7 +415,7 @@ export const useTrainingStore = create<TrainingState & TrainingActions>()(
           const response = await fetch('/api/strava/sync', {
             method: 'POST',
             headers: buildApiKeyHeaders(get().apiKeys),
-            body: JSON.stringify({}),
+            body: JSON.stringify({ thresholdHR: get().userMetrics.ANP }),
           });
 
           if (!response.ok) {

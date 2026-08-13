@@ -11,6 +11,11 @@ import {
   getStravaClientSecretFromEnv,
   getStravaRedirectUriFromEnv,
 } from './strava/env';
+import {
+  calculateGapPaceString,
+  calculateHrTSS,
+  inferTerrainType,
+} from './loadManagement';
 
 const STRAVA_API_BASE = 'https://www.strava.com/api/v3';
 const STRAVA_OAUTH_BASE = 'https://www.strava.com/oauth';
@@ -39,6 +44,7 @@ export interface StravaActivity {
   start_date_local: string;
   type: string;
   sport_type: string;
+  total_elevation_gain?: number;
 }
 
 export interface StravaWebhookEvent {
@@ -278,19 +284,39 @@ export function stravaActivityToActual(
     laps?: StravaLapRaw[];
     zones?: StravaZoneDistribution[];
   },
+  options?: { thresholdHR?: number },
 ): NonNullable<WorkoutSession['actual']> {
   const laps = details?.laps ? mapStravaLapsToSummaries(details.laps) : undefined;
   const hrZones = details?.zones ? mapStravaZonesToSummaries(details.zones) : undefined;
+  const elevationGainM = Math.round(activity.total_elevation_gain ?? 0);
+  const distanceKm = Math.round((activity.distance / 1000) * 100) / 100;
+  const durationMin = Math.round(activity.moving_time / 60);
+  const avgPace = formatPaceFromActivity(activity.moving_time, activity.distance);
+  const avgHR = Math.round(activity.average_heartrate ?? 0);
+  const terrainType = inferTerrainType(activity.name ?? '', activity.sport_type);
+  const thresholdHR = options?.thresholdHR ?? 0;
+  const tss =
+    thresholdHR > 0 && avgHR > 0
+      ? calculateHrTSS(durationMin, avgHR, thresholdHR)
+      : undefined;
+  const gapPace =
+    elevationGainM > 0
+      ? calculateGapPaceString(avgPace, distanceKm, elevationGainM)
+      : undefined;
 
   return {
     stravaActivityId: activity.id,
-    distanceKm: Math.round((activity.distance / 1000) * 100) / 100,
-    durationMin: Math.round(activity.moving_time / 60),
-    avgPace: formatPaceFromActivity(activity.moving_time, activity.distance),
-    avgHR: Math.round(activity.average_heartrate ?? 0),
+    distanceKm,
+    durationMin,
+    avgPace,
+    avgHR,
     garminSyncStatus: 'synced',
     laps: laps && laps.length > 0 ? laps : undefined,
     hrZones: hrZones && hrZones.length > 0 ? hrZones : undefined,
+    elevationGainM: elevationGainM > 0 ? elevationGainM : undefined,
+    tss,
+    gapPace,
+    terrainType,
   };
 }
 
@@ -314,8 +340,9 @@ export function stravaActivityToActivity(
     laps?: StravaLapRaw[];
     zones?: StravaZoneDistribution[];
   },
+  options?: { thresholdHR?: number },
 ): Activity {
-  const actual = stravaActivityToActual(activity, details);
+  const actual = stravaActivityToActual(activity, details, options);
   return {
     id: `strava-${activity.id}`,
     stravaActivityId: activity.id,
@@ -329,6 +356,10 @@ export function stravaActivityToActivity(
     garminSyncStatus: actual.garminSyncStatus,
     laps: actual.laps,
     hrZones: actual.hrZones,
+    elevationGainM: actual.elevationGainM,
+    tss: actual.tss,
+    gapPace: actual.gapPace,
+    terrainType: actual.terrainType,
   };
 }
 
@@ -461,6 +492,7 @@ export function pickBestRunPerDay(activities: StravaActivity[]): Map<string, Str
 export async function buildActivitiesByDate(
   accessToken: string,
   activities: StravaActivity[],
+  options?: { thresholdHR?: number },
 ): Promise<Map<string, Activity[]>> {
   const grouped = groupRunsByDay(activities);
   const allRuns = Array.from(grouped.values()).flat();
@@ -483,7 +515,9 @@ export async function buildActivitiesByDate(
           }),
         ]);
 
-        const converted = stravaActivityToActivity(activity, { laps, zones });
+        const converted = stravaActivityToActivity(activity, { laps, zones }, {
+          thresholdHR: options?.thresholdHR,
+        });
         const existing = result.get(dateKey) ?? [];
         existing.push(converted);
         existing.sort((a, b) => (a.phase ?? 'AM').localeCompare(b.phase ?? 'AM'));

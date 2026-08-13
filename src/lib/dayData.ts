@@ -84,6 +84,10 @@ function sessionActualToActivity(session: WorkoutSession): Activity {
     garminSyncStatus: actual.garminSyncStatus,
     laps: actual.laps,
     hrZones: actual.hrZones,
+    elevationGainM: actual.elevationGainM,
+    tss: actual.tss,
+    gapPace: actual.gapPace,
+    terrainType: actual.terrainType,
   };
 }
 

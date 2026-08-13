@@ -10,6 +10,11 @@ import {
   buildRecentStravaRunsDetail,
 } from './coachingAnalytics';
 import { buildMacrocyclePhaseContext } from './athleteProfileContext';
+import {
+  buildLoadManagementContext,
+  buildObKrosEvaluationRules,
+} from './loadManagement';
+import { buildMesocycleContext } from './mesocycle';
 import type { ActivityType, DayData, PlannedWorkout } from '../types/training';
 import type { UserMetrics } from '../types/settings';
 
@@ -548,6 +553,9 @@ export function buildAiContextSummaries(
   stravaHistorySummary: string;
   longTermHistorySummary: string;
   macrocyclePhaseSummary: string;
+  loadManagementSummary: string;
+  mesocycleSummary: string;
+  obKrosRulesSummary: string;
   recentRunsDetail: string;
   weeklyMicrocycleSummary: string;
   currentWeekActualVsPlan: string;
@@ -560,6 +568,13 @@ export function buildAiContextSummaries(
     macrocyclePhaseSummary: userMetrics
       ? buildMacrocyclePhaseContext(userMetrics)
       : 'Makrocyklus: chybí profil sportovce.',
+    loadManagementSummary: userMetrics
+      ? buildLoadManagementContext(days, userMetrics)
+      : 'Load management: chybí profil sportovce.',
+    mesocycleSummary: userMetrics
+      ? buildMesocycleContext(userMetrics)
+      : 'Mesocyklus 3+1: chybí profil sportovce.',
+    obKrosRulesSummary: buildObKrosEvaluationRules(),
     recentRunsDetail: buildRecentStravaRunsDetail(days, 14, userMetrics),
     weeklyMicrocycleSummary: buildWeeklyMicrocycleContext(days),
     currentWeekActualVsPlan: buildCurrentWeekActualVsPlan(days),
@@ -596,6 +611,9 @@ export function buildChatAiContext(
   stravaHistorySummary: string;
   longTermHistorySummary: string;
   macrocyclePhaseSummary: string;
+  loadManagementSummary: string;
+  mesocycleSummary: string;
+  obKrosRulesSummary: string;
   recentRunsDetail: string;
   weeklyMicrocycleSummary: string;
   currentWeekActualVsPlan: string;

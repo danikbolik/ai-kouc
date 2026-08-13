@@ -130,6 +130,18 @@ export interface Activity {
 
   hrZones?: StravaHrZoneSummary[];
 
+  /** Nastoupané metry ze Stravy (+m) */
+  elevationGainM?: number;
+
+  /** Training Stress Score (hrTSS) */
+  tss?: number;
+
+  /** Grade Adjusted Pace – korigované tempo na rovinu */
+  gapPace?: string;
+
+  /** Typ terénu pro OB/kros logiku */
+  terrainType?: 'road' | 'ob' | 'kros' | 'trail';
+
 }
 
 
@@ -231,6 +243,14 @@ export interface WorkoutSession {
     laps?: StravaLapSummary[];
 
     hrZones?: StravaHrZoneSummary[];
+
+    elevationGainM?: number;
+
+    tss?: number;
+
+    gapPace?: string;
+
+    terrainType?: 'road' | 'ob' | 'kros' | 'trail';
 
   };
 

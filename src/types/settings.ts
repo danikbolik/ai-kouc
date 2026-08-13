@@ -31,6 +31,8 @@ export interface UserMetrics {
   raceDistanceKm?: number;
   paceZones?: PaceZone[];
   hrZones?: HrZone[];
+  /** Pondělí startu aktuálního 3+1 mesocyklu (YYYY-MM-DD) */
+  mesocycleStartDate?: string;
 }
 
 export interface UploadedMethodology {

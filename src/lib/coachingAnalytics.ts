@@ -1,6 +1,7 @@
 import { addDaysToDate, formatDateKey, getTodayDate, getWeekDays, parseDate } from './dates';
 import { getActivities, normalizeDayData } from './dayData';
 import { classifyHeartRateZone } from './athleteProfileContext';
+import { formatActivityLoadLine, isObOrKrosTerrain, enrichActivityMetrics } from './loadManagement';
 import type { Activity, ActivityType, DayData, StravaHrZoneSummary } from '../types/training';
 import type { PaceZone, UserMetrics } from '../types/settings';
 import { DEFAULT_PACE_ZONES } from '../types/settings';
@@ -403,29 +404,45 @@ export function buildRecentStravaRunsDetail(
 ): string {
   const today = getTodayDate();
   const from = formatDateKey(addDaysToDate(parseDate(today), -(lastDays - 1)));
-  const activities = collectActivitiesInRange(days, from, today);
+  const lines: string[] = [];
 
-  if (activities.length === 0) {
+  for (const [date, rawDay] of Object.entries(days)) {
+    if (date < from || date > today) continue;
+    const day = normalizeDayData(rawDay);
+    for (const activity of getActivities(day)) {
+      if (activity.distanceKm <= 0 && activityDurationMin(activity) <= 0) continue;
+      const enriched = userMetrics ? enrichActivityMetrics(activity, userMetrics) : activity;
+      const hrZone =
+        userMetrics && enriched.avgHR > 0
+          ? classifyHeartRateZone(enriched.avgHR, userMetrics)
+          : '?';
+      const hrDetail =
+        enriched.hrZones?.filter((z) => z.timeSec > 0)
+          .map((z) => `${z.zone} ${z.percent}%`)
+          .join(', ') ?? null;
+      const loadExtras =
+        userMetrics && (enriched.tss || enriched.elevationGainM)
+          ? ` | ${formatActivityLoadLine(enriched, userMetrics)}`
+          : '';
+      const obNote =
+        userMetrics && isObOrKrosTerrain(enriched.terrainType)
+          ? ' | ⚠ OB/Kros – nehodnotit dle plochého tempa'
+          : '';
+
+      lines.push(`- **${date} (${formatCzechWeekday(date)})** | ${enriched.title} (${CATEGORY_LABELS[classifyWorkoutCategory(enriched)]})
+  TF ${enriched.avgHR || '?'} (${hrZone})${hrDetail ? ` | zóny: ${hrDetail}` : ''}${loadExtras}${obNote}`);
+    }
+  }
+
+  lines.sort((a, b) => a.localeCompare(b));
+
+  if (lines.length === 0) {
     return `## Přesný přehled odbehaných běhů (posledních ${lastDays} dní)
 Žádné synchronizované běhy – AI nemá data o včerejšku ani minulých dnech.`;
   }
 
-  const lines = activities.map((a) => {
-    const hrZone =
-      userMetrics && a.avgHR > 0
-        ? classifyHeartRateZone(a.avgHR, userMetrics)
-        : '?';
-    const hrDetail =
-      a.hrZones?.filter((z) => z.timeSec > 0)
-        .map((z) => `${z.zone} ${z.percent}%`)
-        .join(', ') ?? null;
-
-    return `- **${a.date} (${formatCzechWeekday(a.date)})** | ${a.title} (${CATEGORY_LABELS[a.category]})
-  ${a.distanceKm} km @ ${a.avgPace}/km, ${a.durationMin} min, TF ${a.avgHR || '?'} (${hrZone})${hrDetail ? ` | zóny: ${hrDetail}` : ''}`;
-  });
-
   return `## Přesný přehled odbehaných běhů ze Stravy (posledních ${lastDays} dní)
-Použij pro kontrolu včerejška, středy a dalších dnů – v odpovědi referuj český den („Ve středu jsi běžel…", „Včera jsi odtrénoval…") a porovnej s plánem.
+Použij pro kontrolu včerejška, středy a dalších dnů – referuj český den. U OB/krosu hodnot TSS, +m a TF, ne ploché tempo.
 
 ${lines.join('\n')}`;
 }

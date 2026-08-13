@@ -47,11 +47,21 @@ export async function POST(request: Request) {
   }
 
   try {
+    let thresholdHR: number | undefined;
+    try {
+      const body = (await request.json()) as { thresholdHR?: number };
+      thresholdHR = body.thresholdHR;
+    } catch {
+      thresholdHR = undefined;
+    }
+
     const activities = await fetchAllActivities(accessToken, { perPage: 200 });
 
     console.log('[Strava sync] Stažené aktivity:', activities.length);
 
-    const activitiesByDate = await buildActivitiesByDate(accessToken, activities);
+    const activitiesByDate = await buildActivitiesByDate(accessToken, activities, {
+      thresholdHR,
+    });
 
     const activitiesByDateObject: Record<string, import('@/types/training').Activity[]> =
       {};

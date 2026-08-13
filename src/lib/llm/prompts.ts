@@ -230,6 +230,9 @@ export function buildChatUserPrompt(
     stravaHistorySummary: string;
     longTermHistorySummary: string;
     macrocyclePhaseSummary: string;
+    loadManagementSummary: string;
+    mesocycleSummary: string;
+    obKrosRulesSummary: string;
     recentRunsDetail: string;
     weeklyMicrocycleSummary: string;
     currentWeekActualVsPlan: string;
@@ -245,6 +248,9 @@ export function buildChatUserPrompt(
     : 'Období kalendáře: posledních 30 dní + nadcházející 3 týdny';
 
   const macrocycleBlock = historySummaries?.macrocyclePhaseSummary ?? '';
+  const loadBlock = historySummaries?.loadManagementSummary ?? '';
+  const mesocycleBlock = historySummaries?.mesocycleSummary ?? '';
+  const obKrosBlock = historySummaries?.obKrosRulesSummary ?? '';
   const longTermBlock = historySummaries?.longTermHistorySummary ?? '';
   const recentRunsBlock = historySummaries?.recentRunsDetail ?? '';
   const microcycleBlock = historySummaries?.weeklyMicrocycleSummary ?? '';
@@ -262,6 +268,12 @@ ${queryInstructions ? `${queryInstructions}\n\n` : ''}## Profil sportovce – z�
 ${userMetrics ? buildUserProfileContext(userMetrics) : 'N/A'}
 
 ${macrocycleBlock}
+
+${loadBlock}
+
+${mesocycleBlock}
+
+${obKrosBlock}
 
 ${longTermBlock}
 

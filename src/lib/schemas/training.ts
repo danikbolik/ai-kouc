@@ -55,6 +55,10 @@ export const actualSchema = z
     stravaActivityId: z.coerce.number().optional().nullable(),
     laps: z.array(stravaLapSummarySchema).optional().nullable(),
     hrZones: z.array(stravaHrZoneSummarySchema).optional().nullable(),
+    elevationGainM: z.coerce.number().optional().nullable(),
+    tss: z.coerce.number().optional().nullable(),
+    gapPace: z.string().optional().nullable(),
+    terrainType: z.enum(['road', 'ob', 'kros', 'trail']).optional().nullable(),
   })
   .optional()
   .nullable();
@@ -144,6 +148,10 @@ export const activitySchema = z.object({
   garminSyncStatus: z.enum(['synced', 'pending']).catch('synced'),
   laps: z.array(stravaLapSummarySchema).optional().nullable(),
   hrZones: z.array(stravaHrZoneSummarySchema).optional().nullable(),
+  elevationGainM: z.coerce.number().optional().nullable(),
+  tss: z.coerce.number().optional().nullable(),
+  gapPace: z.string().optional().nullable(),
+  terrainType: z.enum(['road', 'ob', 'kros', 'trail']).optional().nullable(),
 });
 
 export const dayDataSchema = z.object({

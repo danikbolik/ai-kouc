@@ -13,6 +13,7 @@ import {
   buildRecalculateUserPrompt,
   enforceLockedSessions,
 } from '@/lib/llm/prompts';
+import { enrichReplyWithWorkoutPlanFormat } from '@/lib/workoutPlanChatFormat';
 import { buildAiContextSummaries } from '@/lib/trainingHistoryContext';
 import { buildRecalculateRagContext } from '@/lib/ragKnowledge';
 import { adaptTrainingPlan } from '@/lib/planAdaptation';
@@ -37,6 +38,15 @@ import type { DayData, WorkoutSession } from '@/types/training';
 const DEFAULT_MODEL = process.env.OPENAI_MODEL ?? 'gpt-4o';
 
 type LlmRecalculateResponse = z.infer<typeof recalculateResponseSchema>;
+
+const updateCalendarWorkoutItemSchema = workoutPlanItemSchema.extend({
+  coachReasoning: z
+    .string()
+    .min(20)
+    .describe(
+      'Odůvodnění trenéra pro chat: proč je trénink takto nastaven, jak navazuje na předchozí dny, fyziologické riziko nebo přínos',
+    ),
+});
 
 function stripNull<T>(value: T | null | undefined): T | undefined {
   return value === null ? undefined : value;
@@ -281,17 +291,17 @@ export async function chatWithTools(
       historySummaries,
     ),
     tools: {
-      create_workout_plan: tool({
+      update_calendar_workouts: tool({
         description:
-          'Vloží nebo OPRAVÍ plánované tréninky přímo v kalendáři. POVINNÉ při návrhu nebo korekci plánu. Při úpravě JEDNOHO dne pošli VŠECHNY dotčené dny týdne najednou (např. čtvrtek + sobota + neděle). Pro update existujícího tréninku vyplň jeho id. PŘED voláním vysvětli dopad na celý mikrocyklus v replyText. U intervalů/tempa/závodů vyplň warmUp a coolDown. U závodů vyplň raceDetails.',
+          'Zapíše nebo OPRAVÍ plánované tréninky v kalendáři (function calling). POVINNÉ při generování/korekci plánu. Pošli VŠECHNY dotčené dny najednou. U každého tréninku vyplň coachReasoning (zobrazí se v chatu). V replyText u každého dne uveď: 📅 Datum – název | Parametry | Odůvodnění trenéra. U intervalů/tempa/závodů vyplň warmUp/coolDown. U závodů raceDetails.',
         parameters: z.object({
-          workouts: z.array(workoutPlanItemSchema).min(1),
+          workouts: z.array(updateCalendarWorkoutItemSchema).min(1),
         }),
         execute: async ({ workouts }) => ({ workouts }),
       }),
       delete_planned_workouts: tool({
         description:
-          'Smaže plánované tréninky z kalendáře. Použij při kompenzační úpravě mikrocyklu – zrušení druhé fáze, volný den, odstranění přebytečné zátěže. workoutId najdeš v sekci Týdenní mikrocyklus (id=...). Volání lze kombinovat s create_workout_plan ve stejné odpovědi.',
+          'Smaže plánované tréninky z kalendáře. Použij při kompenzační úpravě mikrocyklu. V replyText vysvětli proč byl trénink zrušen. Lze kombinovat s update_calendar_workouts.',
         parameters: z.object({
           deletions: z
             .array(
@@ -327,7 +337,7 @@ export async function chatWithTools(
   const savedCoachNotes: CoachNoteInput[] = [];
 
   for (const toolResult of result.toolResults) {
-    if (toolResult.toolName === 'create_workout_plan') {
+    if (toolResult.toolName === 'update_calendar_workouts') {
       const payload = toolResult.result as { workouts?: WorkoutPlanItem[] };
       const workouts = payload.workouts ?? [];
       workoutPlan = workouts;
@@ -357,8 +367,10 @@ export async function chatWithTools(
     }
   }
 
+  const replyText = enrichReplyWithWorkoutPlanFormat(result.text, workoutPlan);
+
   return {
-    replyText: result.text,
+    replyText,
     references: [] as { bookTitle: string; chapterOrPage: string; quote: string }[],
     workoutPlan,
     calendarActions,

@@ -351,7 +351,7 @@ ${remainingLines.length > 0 ? remainingLines.join('\n') : 'Žádné plánované 
 ### PŘÍKAZ PRO AI – mikrocyklus
 1. Při JAKÉKOLI úpravě jednoho dne (rychlost, objem, únava, preference) vyhodnoť dopad na VŠECHNY zbývající dny tohoto týdne.
 2. Pokud úprava zvýší zátěž (např. zachování intervalů), AUTOMATICKY navrhni kompenzaci: snížení intenzity, zrušení druhé fáze, volný den, Z1 regenerace.
-3. V create_workout_plan pošli VŠECHNY dotčené dny NAJEDNOU (např. čtvrtek + sobota + neděle) – id existujícího tréninku vyplň pro update, pro smazání použij delete_planned_workouts.
+3. V update_calendar_workouts pošli VŠECHNY dotčené dny NAJEDNOU – id existujícího tréninku vyplň pro update, pro smazání použij delete_planned_workouts.
 4. V odpovědi uveď **Přehled upraveného harmonogramu do konce týdne** – den po dni s vysvětlením souvislostí.
 5. Příklad tónu: „Rozumím, chceš zachovat rychlost. Zkrátil jsem intervaly na 10×500 m. Aby ses nepřetížil před víkendem, upravil jsem zbytek týdne: sobota – zrušena druhá fáze, neděle – snížena TF na Z1."`;
 }

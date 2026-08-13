@@ -1,5 +1,6 @@
 import { buildEnhancedAthleteProfile } from '@/lib/athleteProfileContext';
 import { buildIntervalDescription } from '@/lib/intervalBuilder';
+import { WORKOUT_PLAN_CHAT_FORMAT_EXAMPLE } from '@/lib/workoutPlanChatFormat';
 import { formatWorkoutExtrasForAi, getPlannedWorkoutTotalDistanceKm } from '@/lib/workoutExtras';
 import { dayToLegacySessions, normalizeDayData } from '@/lib/dayData';
 import {
@@ -201,8 +202,11 @@ Neodpovídej suchým „Provedl jsem úpravy". Struktura odpovědi:
 1. **Reakce na požadavek sportovce** – co chce a jak to ovlivní zátěž týdne
 2. **Úprava požadovaného dne** – konkrétní změna (např. zkrácení intervalů)
 3. **Kompenzace navazujících dnů** – co měníš v sobotě/neděli/atd. a proč (acidóza, glykogen, back-to-back)
-4. **Přehled upraveného harmonogramu do konce týdne** – tabulka/seznam den po dni
-5. V create_workout_plan pošli VŠECHNY dotčené dny najednou; pro smazání fáze použij delete_planned_workouts (workoutId z mikrocyklu)`);
+4. **Přehled upraveného harmonogramu do konce týdne** – každý den ve formátu 📅 / Parametry / Odůvodnění trenéra (viz příklad níže)
+5. V update_calendar_workouts pošli VŠECHNY dotčené dny najednou s vyplněným coachReasoning; pro smazání použij delete_planned_workouts
+
+Příklad povinného formátu výstupu v chatu:
+${WORKOUT_PLAN_CHAT_FORMAT_EXAMPLE}`);
   }
 
   return parts.length > 0 ? parts.join('\n\n') : '';
@@ -280,10 +284,10 @@ ${calendarContext}
 4. Porovnej nadcházející plán s dlouhodobou historií i s přesným přehledem posledních odbehaných běhů ze Stravy – cituj konkrétní dny („Ve středu jsi běžel…").
 5. Explicitně zohledni odjeté dny tohoto týdne (sekce aktuální týden) při analýze zbytku týdne.
 6. Pokud detekuješ chybu, varuj ostře, edukuj a vysvětli fyziologické riziko – ne jen „to není ideální".
-7. Při korekci plánu: vyhodnoť dopad na CELÝ týdenní mikrocyklus – kompenzuj navazující dny, pošli všechny změny najednou v create_workout_plan (+ delete_planned_workouts pro smazání).
-8. V odpovědi vždy uveď **Přehled upraveného harmonogramu do konce týdne** – den po dni s trenérským zdůvodněním.
-9. U intervalů, tempa a závodů vyplň warmUp/coolDown; u závodů raceDetails pro správný tapering.
-10. V textu uveď konkrétní změny v souvislostech celého týdne (např. „Čtvrtek: 10×500 m místo 15× – Sobota: zrušena 2. fáze – Neděle: TF snížena na Z1").
+7. Při korekci plánu: vyhodnoť dopad na CELÝ mikrocyklus; pošli všechny změny v update_calendar_workouts (+ delete_planned_workouts).
+8. Po zápisu plánu ukaž v chatu každý trénink: 📅 Datum – název | **Parametry** | **Odůvodnění trenéra** (vyplň coachReasoning v tool call).
+9. V odpovědi vždy uveď **Přehled upraveného harmonogramu do konce týdne** – den po dni.
+10. U intervalů, tempa a závodů vyplň warmUp/coolDown; u závodů raceDetails.
 11. Zamčené tréninky (isLocked) neměň ani nemaž.
 `.trim();
 }

@@ -1,4 +1,3 @@
-import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 
 import {
@@ -6,11 +5,21 @@ import {
   fetchAllActivities,
   isStravaConfigured,
 } from '@/lib/strava';
+import {
+  getStravaClientIdFromEnv,
+  getStravaClientSecretFromEnv,
+} from '@/lib/strava/env';
 import { getValidStravaAccessToken, hasStravaConnection } from '@/lib/strava/tokenAccess';
-import { resolveStravaCredentialsWithCookies } from '@/lib/stravaCredentials';
+
+function stravaCredentials() {
+  return {
+    clientId: getStravaClientIdFromEnv(),
+    clientSecret: getStravaClientSecretFromEnv(),
+  };
+}
 
 export async function GET(request: Request) {
-  const credentials = await resolveStravaCredentialsWithCookies(request);
+  const credentials = stravaCredentials();
 
   return NextResponse.json({
     connected: await hasStravaConnection(request),
@@ -20,7 +29,7 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const credentials = await resolveStravaCredentialsWithCookies(request);
+  const credentials = stravaCredentials();
 
   if (!isStravaConfigured(credentials)) {
     return NextResponse.json({ error: 'Strava not configured' }, { status: 503 });
@@ -28,17 +37,24 @@ export async function POST(request: Request) {
 
   const accessToken = await getValidStravaAccessToken(request, credentials);
   if (!accessToken) {
-    return NextResponse.json({ error: 'Strava not connected' }, { status: 401 });
+    return NextResponse.json(
+      {
+        error:
+          'Strava token vypršel a obnova selhala. Připoj účet Strava znovu v Nastavení.',
+      },
+      { status: 401 },
+    );
   }
 
   try {
     const activities = await fetchAllActivities(accessToken, { perPage: 200 });
 
-    console.log('Stažené aktivity ze Stravy (kompletní historie):', activities.length);
+    console.log('[Strava sync] Stažené aktivity:', activities.length);
 
     const activitiesByDate = await buildActivitiesByDate(accessToken, activities);
 
-    const activitiesByDateObject: Record<string, import('@/types/training').Activity[]> = {};
+    const activitiesByDateObject: Record<string, import('@/types/training').Activity[]> =
+      {};
     for (const [date, list] of activitiesByDate) {
       activitiesByDateObject[date] = list;
     }
@@ -51,6 +67,8 @@ export async function POST(request: Request) {
     });
   } catch (error) {
     console.error('[Strava sync]', error);
-    return NextResponse.json({ error: 'Sync failed' }, { status: 500 });
+    const message =
+      error instanceof Error ? error.message : 'Synchronizace se Stravou selhala.';
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

@@ -180,7 +180,9 @@ function buildQuerySpecificInstructions(message: string): string {
       lower,
     );
   const isPlanChangeQuery =
-    /uprav|oprav|změn|zmen|přeplánuj|preplanuj|korek|nahraď|nahrad|vyměň|vymen/.test(lower);
+    /uprav|oprav|změn|zmen|přeplánuj|preplanuj|korek|nahraď|nahrad|vyměň|vymen|únava|unava|rychl|objem|trvá|trva|chci|zachovat|mikrocykl|týden|tyden|přetíž|pretiz|regener/.test(
+      lower,
+    );
 
   const parts: string[] = [];
 
@@ -194,12 +196,13 @@ d) **Verdikt** – jasné hodnocení (vhodná / riziková / nevhodná pro fázi)
   }
 
   if (isPlanChangeQuery) {
-    parts.push(`### POVINNÝ FORMÁT PŘI ÚPRAVĚ PLÁNU
+    parts.push(`### POVINNÝ FORMÁT PŘI ÚPRAVĚ PLÁNU – TÝDENNÍ MIKROCYKLUS
 Neodpovídej suchým „Provedl jsem úpravy". Struktura odpovědi:
-1. **Chyba v původním plánu** – konkrétní trénink (datum, typ, intenzita)
-2. **Fyziologické riziko** – acidóza, glykogen, zranění, nervová únava, taper
-3. **Co měníš a proč** – s odkazem na metodiku (Seiler/Canova/Daniels)
-4. Teprve potom zavolej create_workout_plan`);
+1. **Reakce na požadavek sportovce** – co chce a jak to ovlivní zátěž týdne
+2. **Úprava požadovaného dne** – konkrétní změna (např. zkrácení intervalů)
+3. **Kompenzace navazujících dnů** – co měníš v sobotě/neděli/atd. a proč (acidóza, glykogen, back-to-back)
+4. **Přehled upraveného harmonogramu do konce týdne** – tabulka/seznam den po dni
+5. V create_workout_plan pošli VŠECHNY dotčené dny najednou; pro smazání fáze použij delete_planned_workouts (workoutId z mikrocyklu)`);
   }
 
   return parts.length > 0 ? parts.join('\n\n') : '';
@@ -216,6 +219,7 @@ export function buildChatUserPrompt(
     longTermHistorySummary: string;
     macrocyclePhaseSummary: string;
     recentRunsDetail: string;
+    weeklyMicrocycleSummary: string;
     currentWeekActualVsPlan: string;
     upcomingPlanSummary: string;
     planComparisonSummary: string;
@@ -231,6 +235,7 @@ export function buildChatUserPrompt(
   const macrocycleBlock = historySummaries?.macrocyclePhaseSummary ?? '';
   const longTermBlock = historySummaries?.longTermHistorySummary ?? '';
   const recentRunsBlock = historySummaries?.recentRunsDetail ?? '';
+  const microcycleBlock = historySummaries?.weeklyMicrocycleSummary ?? '';
   const stravaBlock = historySummaries?.stravaHistorySummary ?? '';
   const currentWeekBlock = historySummaries?.currentWeekActualVsPlan ?? '';
   const upcomingBlock = historySummaries?.upcomingPlanSummary ?? '';
@@ -249,6 +254,8 @@ ${macrocycleBlock}
 ${longTermBlock}
 
 ${recentRunsBlock}
+
+${microcycleBlock}
 
 ${stravaBlock}
 
@@ -273,10 +280,11 @@ ${calendarContext}
 4. Porovnej nadcházející plán s dlouhodobou historií i s přesným přehledem posledních odbehaných běhů ze Stravy – cituj konkrétní dny („Ve středu jsi běžel…").
 5. Explicitně zohledni odjeté dny tohoto týdne (sekce aktuální týden) při analýze zbytku týdne.
 6. Pokud detekuješ chybu, varuj ostře, edukuj a vysvětli fyziologické riziko – ne jen „to není ideální".
-7. Při korekci plánu: NEJDŘÍV vysvětli chybu + riziko + důvod opravy, PAK zavolej create_workout_plan. Nikdy suché „Provedl jsem úpravy".
-8. U intervalů, tempa a závodů vyplň warmUp/coolDown; u závodů raceDetails pro správný tapering.
-9. V textu uveď konkrétní změny (např. „Úterý: změněno z 15×500m na 8 km Z2 regenerace – riziko acidózy před závodem").
-10. Zamčené tréninky (isLocked) neměň ani nemaž.
+7. Při korekci plánu: vyhodnoť dopad na CELÝ týdenní mikrocyklus – kompenzuj navazující dny, pošli všechny změny najednou v create_workout_plan (+ delete_planned_workouts pro smazání).
+8. V odpovědi vždy uveď **Přehled upraveného harmonogramu do konce týdne** – den po dni s trenérským zdůvodněním.
+9. U intervalů, tempa a závodů vyplň warmUp/coolDown; u závodů raceDetails pro správný tapering.
+10. V textu uveď konkrétní změny v souvislostech celého týdne (např. „Čtvrtek: 10×500 m místo 15× – Sobota: zrušena 2. fáze – Neděle: TF snížena na Z1").
+11. Zamčené tréninky (isLocked) neměň ani nemaž.
 `.trim();
 }
 

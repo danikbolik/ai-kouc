@@ -26,6 +26,7 @@ import {
 import {
   CHAT_SYSTEM_PROMPT,
   RECALCULATE_SYSTEM_PROMPT,
+  type CalendarAction,
   type RecalculateRequest,
   type RecalculateResponse,
   type WorkoutPlanItem,
@@ -282,11 +283,26 @@ export async function chatWithTools(
     tools: {
       create_workout_plan: tool({
         description:
-          'Vloží nebo OPRAVÍ plánované tréninky přímo v kalendáři. POVINNÉ při návrhu plánu, korekci chyb nebo nahrazení nebezpečného tréninku. PŘED voláním MUSÍš v replyText vysvětlit: (1) chybu v původním plánu, (2) fyziologické riziko, (3) důvod konkrétní opravy – nikdy suché „Provedl jsem úpravy". U intervalů/tempa/závodů vyplň warmUp a coolDown (value + unit km|min). U závodů vyplň raceDetails (durationMin, distanceValue, distanceUnit, raceType: ob|kros|track_road).',
+          'Vloží nebo OPRAVÍ plánované tréninky přímo v kalendáři. POVINNÉ při návrhu nebo korekci plánu. Při úpravě JEDNOHO dne pošli VŠECHNY dotčené dny týdne najednou (např. čtvrtek + sobota + neděle). Pro update existujícího tréninku vyplň jeho id. PŘED voláním vysvětli dopad na celý mikrocyklus v replyText. U intervalů/tempa/závodů vyplň warmUp a coolDown. U závodů vyplň raceDetails.',
         parameters: z.object({
           workouts: z.array(workoutPlanItemSchema).min(1),
         }),
         execute: async ({ workouts }) => ({ workouts }),
+      }),
+      delete_planned_workouts: tool({
+        description:
+          'Smaže plánované tréninky z kalendáře. Použij při kompenzační úpravě mikrocyklu – zrušení druhé fáze, volný den, odstranění přebytečné zátěže. workoutId najdeš v sekci Týdenní mikrocyklus (id=...). Volání lze kombinovat s create_workout_plan ve stejné odpovědi.',
+        parameters: z.object({
+          deletions: z
+            .array(
+              z.object({
+                date: z.string(),
+                workoutId: z.string(),
+              }),
+            )
+            .min(1),
+        }),
+        execute: async ({ deletions }) => ({ deletions }),
       }),
       save_coach_note: tool({
         description:
@@ -307,12 +323,27 @@ export async function chatWithTools(
   });
 
   let workoutPlan: WorkoutPlanItem[] = [];
+  const calendarActions: CalendarAction[] = [];
   const savedCoachNotes: CoachNoteInput[] = [];
 
   for (const toolResult of result.toolResults) {
     if (toolResult.toolName === 'create_workout_plan') {
       const payload = toolResult.result as { workouts?: WorkoutPlanItem[] };
-      workoutPlan = payload.workouts ?? [];
+      const workouts = payload.workouts ?? [];
+      workoutPlan = workouts;
+      calendarActions.push(...planItemsToCalendarActions(workouts));
+    }
+    if (toolResult.toolName === 'delete_planned_workouts') {
+      const payload = toolResult.result as {
+        deletions?: { date: string; workoutId: string }[];
+      };
+      for (const deletion of payload.deletions ?? []) {
+        calendarActions.push({
+          type: 'delete_planned_workout',
+          date: deletion.date,
+          workoutId: deletion.workoutId,
+        });
+      }
     }
     if (toolResult.toolName === 'save_coach_note') {
       const payload = toolResult.result as CoachNoteInput;
@@ -325,8 +356,6 @@ export async function chatWithTools(
       }
     }
   }
-
-  const calendarActions = planItemsToCalendarActions(workoutPlan);
 
   return {
     replyText: result.text,

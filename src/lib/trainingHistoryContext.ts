@@ -10,7 +10,7 @@ import {
   buildRecentStravaRunsDetail,
 } from './coachingAnalytics';
 import { buildMacrocyclePhaseContext } from './athleteProfileContext';
-import type { DayData } from '../types/training';
+import type { ActivityType, DayData, PlannedWorkout } from '../types/training';
 import type { UserMetrics } from '../types/settings';
 
 export const CHAT_HISTORY_DAYS = 30;
@@ -238,6 +238,124 @@ Explicitně vyhodnoť odjeté dny tohoto týdne proti plánu a zohledni je při 
 ${lines.join('\n')}`;
 }
 
+type MicrocycleLoad = 'hard' | 'moderate' | 'easy' | 'rest';
+
+const MICROCYCLE_WEEKDAY_NAMES = [
+  'pondělí',
+  'úterý',
+  'středa',
+  'čtvrtek',
+  'pátek',
+  'sobota',
+  'neděle',
+] as const;
+
+function classifyMicrocycleLoad(type: ActivityType, distanceKm = 0): MicrocycleLoad {
+  if (type === 'rest' || type === 'mobility') return 'rest';
+  if (type === 'intervals' || type === 'race' || type === 'tempo') return 'hard';
+  if (type === 'longrun' || distanceKm >= 15) return 'hard';
+  if (type === 'strength') return 'moderate';
+  return 'easy';
+}
+
+const LOAD_LABELS: Record<MicrocycleLoad, string> = {
+  hard: 'VYSOKÁ',
+  moderate: 'STŘEDNÍ',
+  easy: 'NÍZKÁ',
+  rest: 'VOLNO',
+};
+
+function formatPlannedMicrocycleLine(workout: PlannedWorkout, date: string): string {
+  const totalKm = getPlannedWorkoutTotalDistanceKm(workout);
+  const load = classifyMicrocycleLoad(workout.type, totalKm);
+  const hrPart = workout.targetHR ? `, cíl TF ${workout.targetHR}` : '';
+  const pacePart = workout.targetPace ? ` @ ${workout.targetPace}` : '';
+  const lockPart = workout.isLocked ? ' 🔒' : '';
+  return `- **${date}** | id=\`${workout.id}\` | ${workout.title} (${workout.type}) | ${totalKm > 0 ? `${totalKm} km` : 'bez km'}${pacePart}${hrPart} | zátěž: ${LOAD_LABELS[load]}${lockPart}`;
+}
+
+/** Týdenní mikrocyklus – kontext pro systémové replánování celého týdne */
+export function buildWeeklyMicrocycleContext(days: Record<string, DayData>): string {
+  const today = getTodayDate();
+  const weekDates = getWeekDays(parseDate(today));
+  const overviewLines: string[] = [];
+  const remainingLines: string[] = [];
+  let hardDone = 0;
+  let hardRemaining = 0;
+  let plannedKmDone = 0;
+  let plannedKmRemaining = 0;
+
+  for (let i = 0; i < weekDates.length; i++) {
+    const date = weekDates[i];
+    const weekday = MICROCYCLE_WEEKDAY_NAMES[i];
+    const day = days[date] ? normalizeDayData(days[date]) : null;
+    const activities = day ? getActivities(day) : [];
+    const planned = day ? getPlannedWorkouts(day) : [];
+    const isPast = date < today;
+    const isToday = date === today;
+    const status = isToday ? 'DNES' : isPast ? 'odjeté' : 'zbývá';
+
+    if (activities.length === 0 && planned.length === 0) {
+      overviewLines.push(`- **${weekday} ${date}** (${status}): volno / bez dat`);
+      if (!isPast) remainingLines.push(`- **${weekday} ${date}**: volno – lze zařadit regeneraci nebo volný den`);
+      continue;
+    }
+
+    for (const activity of activities) {
+      const load = classifyMicrocycleLoad(activity.type, activity.distanceKm);
+      if (load === 'hard') hardDone += 1;
+      overviewLines.push(
+        `- **${weekday} ${date}** (${status}) ✅ STRAVA: ${activity.title} | ${activity.distanceKm} km, TF ${activity.avgHR || '?'} | zátěž: ${LOAD_LABELS[load]}`,
+      );
+    }
+
+    for (const workout of planned) {
+      const totalKm = getPlannedWorkoutTotalDistanceKm(workout);
+      const load = classifyMicrocycleLoad(workout.type, totalKm);
+      if (!isPast) {
+        hardRemaining += load === 'hard' ? 1 : 0;
+        plannedKmRemaining += totalKm;
+        remainingLines.push(formatPlannedMicrocycleLine(workout, `${weekday} ${date}`));
+      } else if (activities.length === 0) {
+        plannedKmDone += totalKm;
+        overviewLines.push(
+          `- **${weekday} ${date}** (${status}) 📋 PLÁN (neodjet): ${workout.title} (${workout.type}) | ${totalKm} km | zátěž: ${LOAD_LABELS[load]}`,
+        );
+      } else {
+        plannedKmDone += totalKm;
+      }
+      if (isPast && activities.length === 0 && load === 'hard') hardDone += 1;
+    }
+  }
+
+  const backToBackRisk =
+    hardDone + hardRemaining >= 3
+      ? '⚠ Riziko: 3+ hard sessions v týdnu – při úpravě jednoho dne kompenzuj snížením intenzity v navazujících dnech.'
+      : hardRemaining >= 2
+        ? '⚠ Pozor na back-to-back hard days – mezi kvalitními tréninky vlož regeneraci.'
+        : 'Rozložení zátěže v týdnu zatím udržitelné – stále kontroluj navazující dny.';
+
+  return `## Týdenní mikrocyklus (Po–Ne) – SYSTÉMOVÉ REPLÁNOVÁNÍ
+
+### Přehled celého týdne
+${overviewLines.join('\n')}
+
+### Zbývající dny do konce týdne (od ${today} do neděle)
+${remainingLines.length > 0 ? remainingLines.join('\n') : 'Žádné plánované tréninky – volný zbytek týdne.'}
+
+### Bilance týdne
+- Hard sessions odjeté: ${hardDone} | Hard sessions zbývající v plánu: ${hardRemaining}
+- Plánovaný objem zbývající tento týden: ~${plannedKmRemaining.toFixed(1)} km
+- ${backToBackRisk}
+
+### PŘÍKAZ PRO AI – mikrocyklus
+1. Při JAKÉKOLI úpravě jednoho dne (rychlost, objem, únava, preference) vyhodnoť dopad na VŠECHNY zbývající dny tohoto týdne.
+2. Pokud úprava zvýší zátěž (např. zachování intervalů), AUTOMATICKY navrhni kompenzaci: snížení intenzity, zrušení druhé fáze, volný den, Z1 regenerace.
+3. V create_workout_plan pošli VŠECHNY dotčené dny NAJEDNOU (např. čtvrtek + sobota + neděle) – id existujícího tréninku vyplň pro update, pro smazání použij delete_planned_workouts.
+4. V odpovědi uveď **Přehled upraveného harmonogramu do konce týdne** – den po dni s vysvětlením souvislostí.
+5. Příklad tónu: „Rozumím, chceš zachovat rychlost. Zkrátil jsem intervaly na 10×500 m. Aby ses nepřetížil před víkendem, upravil jsem zbytek týdne: sobota – zrušena druhá fáze, neděle – snížena TF na Z1."`;
+}
+
 function computeWeeklyKm(runs: RunRecord[], weekDates: string[]): number {
   const weekSet = new Set(weekDates);
   return runs
@@ -431,6 +549,7 @@ export function buildAiContextSummaries(
   longTermHistorySummary: string;
   macrocyclePhaseSummary: string;
   recentRunsDetail: string;
+  weeklyMicrocycleSummary: string;
   currentWeekActualVsPlan: string;
   upcomingPlanSummary: string;
   planComparisonSummary: string;
@@ -442,6 +561,7 @@ export function buildAiContextSummaries(
       ? buildMacrocyclePhaseContext(userMetrics)
       : 'Makrocyklus: chybí profil sportovce.',
     recentRunsDetail: buildRecentStravaRunsDetail(days, 14, userMetrics),
+    weeklyMicrocycleSummary: buildWeeklyMicrocycleContext(days),
     currentWeekActualVsPlan: buildCurrentWeekActualVsPlan(days),
     upcomingPlanSummary: buildUpcomingPlanSummary(days),
     planComparisonSummary: buildPlanVsHistoryComparison(days),
@@ -477,6 +597,7 @@ export function buildChatAiContext(
   longTermHistorySummary: string;
   macrocyclePhaseSummary: string;
   recentRunsDetail: string;
+  weeklyMicrocycleSummary: string;
   currentWeekActualVsPlan: string;
   upcomingPlanSummary: string;
   planComparisonSummary: string;

@@ -376,24 +376,16 @@ export function ChatView() {
       setIsLoading(true);
 
       try {
-        const {
-          trainingLog,
-          visiblePeriod,
-          stravaHistorySummary,
-          upcomingPlanSummary,
-          planComparisonSummary,
-        } = buildChatAiContext(days);
+        const { trainingLog, visiblePeriod } = buildChatAiContext(days);
 
         const requestBody = {
           message: trimmed,
           userMetrics,
           trainingLog,
+          allTrainingDays: days,
           uploadedMethodology,
           visiblePeriod,
           coachNotes,
-          stravaHistorySummary,
-          upcomingPlanSummary,
-          planComparisonSummary,
         };
 
         const useStream = false;
@@ -584,13 +576,13 @@ export function ChatView() {
                 {uploadedMethodology.length}{' '}
                 {uploadedMethodology.length === 1 ? 'dokument' : 'dokumenty'}
               </span>
-              {' '}+ historie Strava (30 dní) a nadcházející plán (3 týdny)
+              {' '}+ historie Strava (30 dní + roční souhrn), zóny, cíle a aktuální týden
             </>
           ) : (
             <>
               Načteno:{' '}
-              <span className="font-medium">více metodických zdrojů</span>
-              {' '}(Daniels, Canova, Bakken, Seiler, Uphill Athlete, nahrané podklady) + historie Strava (30 dní) a nadcházející plán
+              <span className="font-medium">long-term kontext</span>
+              {' '}(roční statistiky, zóny TF/tempo, cíle, aktuální týden Strava vs. plán) + multi-source metodika
             </>
           )}
         </p>

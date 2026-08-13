@@ -66,6 +66,7 @@ export async function POST(request: Request) {
           body.userMetrics,
           openAiKey,
           visiblePeriod,
+          body.allTrainingDays,
         );
 
         const ragReferencesJson = JSON.stringify(ragReferences);
@@ -122,6 +123,7 @@ export async function POST(request: Request) {
         openAiKey,
         visiblePeriod,
         body.coachNotes ?? [],
+        body.allTrainingDays,
       );
 
       const mergedReferences = [...llmResult.references];

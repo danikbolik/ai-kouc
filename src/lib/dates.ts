@@ -117,4 +117,15 @@ export function isSameMonth(dateStr: string, viewDate: Date): boolean {
   );
 }
 
+export function getTrainingPhaseLabel(dateStr: string): string {
+  const month = parseDate(dateStr).getMonth();
+  return TRAINING_PHASES[month] ?? 'Tréninkový cyklus';
+}
+
+export function getDaysUntilDate(fromDateStr: string, toDateStr: string): number {
+  const from = parseDate(fromDateStr);
+  const to = parseDate(toDateStr);
+  return Math.round((to.getTime() - from.getTime()) / (1000 * 60 * 60 * 24));
+}
+
 export { CZECH_WEEKDAYS };

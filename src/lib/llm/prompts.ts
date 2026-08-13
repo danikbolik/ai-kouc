@@ -1,3 +1,4 @@
+import { buildEnhancedAthleteProfile } from '@/lib/athleteProfileContext';
 import { buildIntervalDescription } from '@/lib/intervalBuilder';
 import { formatWorkoutExtrasForAi, getPlannedWorkoutTotalDistanceKm } from '@/lib/workoutExtras';
 import { dayToLegacySessions, normalizeDayData } from '@/lib/dayData';
@@ -6,7 +7,6 @@ import {
   summarizeStravaActualForAi,
 } from '@/lib/stravaAnalysis';
 import type { RecalculateRequest, UserMetrics } from '@/types/api';
-import { formatPaceZoneForDisplay } from '@/types/settings';
 import type { DayData, PlannedWorkout, WorkoutSession } from '@/types/training';
 
 /** Detailní kontext kalendáře za posledních 14 dní */
@@ -107,25 +107,9 @@ export function buildUserProfileContext(
   userMetrics: UserMetrics,
   readinessScore?: number,
 ): string {
-  const paceZoneLines =
-    userMetrics.paceZones?.map(
-      (zone) => `${zone.zone}: ${formatPaceZoneForDisplay(zone)} min/km`,
-    ) ?? [];
-
-  return [
-    `HRmax: ${userMetrics.HRmax} bpm`,
-    userMetrics.AeT !== undefined ? `Aerobní práh (AeT): ${userMetrics.AeT} bpm` : null,
-    `Anaerobní práh (ANP): ${userMetrics.ANP} bpm`,
-    paceZoneLines.length > 0 ? `Tempové zóny:\n${paceZoneLines.map((l) => `  - ${l}`).join('\n')}` : null,
-    `Cílový závod: ${userMetrics.targetRace}`,
-    userMetrics.raceDate ? `Datum závodu: ${userMetrics.raceDate}` : null,
-    userMetrics.raceDistanceKm !== undefined
-      ? `Vzdálenost závodu: ${userMetrics.raceDistanceKm} km`
-      : null,
-    readinessScore !== undefined ? `Aktuální ranní únava (readiness): ${readinessScore}/10` : null,
-  ]
-    .filter(Boolean)
-    .join('\n');
+  const profile = buildEnhancedAthleteProfile(userMetrics);
+  if (readinessScore === undefined) return profile;
+  return `${profile}\nAktuální ranní únava (readiness): ${readinessScore}/10`;
 }
 
 export function buildRecalculateUserPrompt(
@@ -196,6 +180,8 @@ export function buildChatUserPrompt(
   visiblePeriod?: { from: string; to: string },
   historySummaries?: {
     stravaHistorySummary: string;
+    longTermHistorySummary: string;
+    currentWeekActualVsPlan: string;
     upcomingPlanSummary: string;
     planComparisonSummary: string;
   },
@@ -208,6 +194,8 @@ export function buildChatUserPrompt(
     : 'Období kalendáře: posledních 30 dní + nadcházející 3 týdny';
 
   const stravaBlock = historySummaries?.stravaHistorySummary ?? '';
+  const longTermBlock = historySummaries?.longTermHistorySummary ?? '';
+  const currentWeekBlock = historySummaries?.currentWeekActualVsPlan ?? '';
   const upcomingBlock = historySummaries?.upcomingPlanSummary ?? '';
   const comparisonBlock = historySummaries?.planComparisonSummary ?? '';
 
@@ -215,10 +203,14 @@ export function buildChatUserPrompt(
 ## Dotaz sportovce
 ${message}
 
-## Profil sportovce
+## Profil sportovce – zóny, cíle a fáze (VYHODNOCUJ TRÉNINKY STRIKTNĚ PODLE TĚCHTO ZÓN)
 ${userMetrics ? buildUserProfileContext(userMetrics) : 'N/A'}
 
+${longTermBlock}
+
 ${stravaBlock}
+
+${currentWeekBlock}
 
 ${upcomingBlock}
 
@@ -233,12 +225,14 @@ ${periodLine}
 ${calendarContext}
 
 ## Instrukce pro analýzu
-1. Porovnej nadcházející plán s reálnou historií ze Stravy – hledaj nebezpečné skoky v objemu, délce longrunu a chybějící regeneraci.
-2. Pokud detekuješ chybu, varuj ostře a věcně s fyziologickým odůvodněním.
-3. Při korekci plánu VŽDY zavolej create_workout_plan – tréninky se automaticky zapíší do kalendáře.
-4. U intervalů, tempa a závodů vyplň warmUp/coolDown; u závodů raceDetails pro správný tapering.
-5. V textu uveď konkrétní změny (např. „Úterý: změněno z 15×500m na 8 km Z2 regenerace").
-6. Zamčené tréninky (isLocked) neměň ani nemaž.
+1. Vyhodnocuj každý běh podle individuálních tepových a tempových zón sportovce – uveď konkrétní zónu (např. „TF 135 = čistá Z1").
+2. Porovnej nadcházející plán s dlouhodobou historií (6–12 měsíců) i s aktuálním týdnem ze Stravy.
+3. Explicitně zohledni odjeté dny tohoto týdne (sekce aktuální týden) při analýze zbytku týdne.
+4. Pokud detekuješ chybu, varuj ostře a věcně s fyziologickým odůvodněním.
+5. Při korekci plánu VŽDY zavolej create_workout_plan – tréninky se automaticky zapíší do kalendáře.
+6. U intervalů, tempa a závodů vyplň warmUp/coolDown; u závodů raceDetails pro správný tapering.
+7. V textu uveď konkrétní změny (např. „Úterý: změněno z 15×500m na 8 km Z2 regenerace").
+8. Zamčené tréninky (isLocked) neměň ani nemaž.
 `.trim();
 }
 

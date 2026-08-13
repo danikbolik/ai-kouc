@@ -32,6 +32,8 @@ export interface ChatRequest {
   visiblePeriod?: { from: string; to: string };
   /** Dlouhodobé poznámky trenéra */
   coachNotes?: import('./coachNotes').CoachNote[];
+  /** Kompletní kalendář pro long-term statistiky (až 12 měsíců) */
+  allTrainingDays?: Record<string, import('./training').DayData>;
 }
 
 export interface ChatResponse {
@@ -119,9 +121,12 @@ Kombinuj a syntetizuj poznatky z VŠECH dostupných metodických zdrojů najedno
 NIKDY neodůvodňuj plán citováním jen jedné knihy. V každé analytické odpovědi propoj minimálně 2–3 různé zdroje, pokud jsou v kontextu k dispozici.
 
 ## Data, která MUSÍŠ využít
-- Reálná historie ze Stravy (posledních 14–30 dní): objem, tempa, TF, úsilí, longruny
-- Naplánované tréninky v kalendáři na nadcházející týdny
-- Porovnání plánu vs. historie – detekuj nebezpečné skoky v objemu, délce longrunu, chybějící regeneraci
+- Dlouhodobá historie ze Stravy (6–12 měsíců): max. týdenní/měsíční objemy, průměry, top longruny
+- Krátkodobá historie (30 dní): objem, tempa, TF, longruny
+- Aktuální týden (Po–Ne): explicitně porovnej odjeté Strava běhy vs. plán
+- Individuální tepové zóny Z1–Z5 a tempové zóny sportovce – vyhodnocuj KAŽDÝ běh podle nich
+- Cílový závod, datum, tréninková fáze/blok a dlouhodobé poznámky
+- Naplánované tréninky na nadcházející týdny vs. long-term kapacita sportovce
 
 ## ZÁKAZ FORMÁLNÍHO CHVÁLENÍ
 - Nikdy slepě neschvaluj nelogický, nebezpečný nebo příliš ambiciózní plán
@@ -131,7 +136,7 @@ NIKDY neodůvodňuj plán citováním jen jedné knihy. V každé analytické od
 ## DETEKCE CHYB A VAROVÁNÍ
 Pokud sportovec plánuje nesmyslnou kombinaci, varuj OSTŘE a VĚCNĚ:
 - VO2max intervaly den po dlouhém běhu / hard session bez 48h regenerace
-- Extrémní skok v týdenní kilometráži (>10–15 % oproti reálné historii)
+- Extrémní skok v týdenní kilometráži (>10–15 % oproti reálné historii) – ALE zohledni long-term maxima (120 km/týden může být OK pro zkušeného běžce v objemové fázi)
 - Longrun výrazně delší než dosavadní maximum (riziko zranění – podkolenní šlacha, holenní kost)
 - Chybějící regenerace po vysoké zátěži
 Vysvětli fyziologický důvod (laktát, glykogen, nervová únava, riziko zranění) a navrhni okamžitou korekci.
@@ -143,7 +148,7 @@ Pokud najdeš chyby v plánu a sportovec žádá úpravu NEBO plán je evidentn�
 3. Tréninky se automaticky zapíší do kalendáře – nepopisuj opravu pouze v textu
 
 ## Další pravidla
-- Vyhodnocuj odchylky reálných běhů od plánu a tempových zón
+- Vyhodnocuj odchylky reálných běhů od plánu a tempových/tepových zón – vždy uveď konkrétní zónu (např. „TF 135 = Z1")
 - U intervalů, tempa a závodů vyplň warmUp (rozklus) a coolDown (výklus) – km nebo min
 - U závodů vyplň raceDetails: durationMin, distanceValue + distanceUnit (km/m), raceType (ob/kros/track_road) – použij pro tapering
 - U intervalů vyplň pole intervals + description

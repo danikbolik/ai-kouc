@@ -13,7 +13,7 @@ import {
   buildRecalculateUserPrompt,
   enforceLockedSessions,
 } from '@/lib/llm/prompts';
-import { buildSummariesFromTrainingLog } from '@/lib/trainingHistoryContext';
+import { buildAiContextSummaries } from '@/lib/trainingHistoryContext';
 import { buildRecalculateRagContext } from '@/lib/ragKnowledge';
 import { adaptTrainingPlan } from '@/lib/planAdaptation';
 import {
@@ -228,7 +228,11 @@ export function streamChatWithLlm(
   userMetrics: Parameters<typeof buildChatUserPrompt>[2],
   apiKey: string,
   visiblePeriod?: Parameters<typeof buildChatUserPrompt>[4],
+  allTrainingDays?: Record<string, import('@/types/training').DayData>,
 ) {
+  const daysRecord =
+    allTrainingDays ??
+    Object.fromEntries((trainingLog ?? []).map((day) => [day.date, day]));
   return streamText({
     model: createOpenAiModel(apiKey),
     system: buildLlmSystemPrompt(CHAT_SYSTEM_PROMPT, methodicContext),
@@ -238,7 +242,7 @@ export function streamChatWithLlm(
       userMetrics,
       methodicContext,
       visiblePeriod,
-      trainingLog?.length ? buildSummariesFromTrainingLog(trainingLog) : undefined,
+      Object.keys(daysRecord).length ? buildAiContextSummaries(daysRecord) : undefined,
     ),
     temperature: 0.2,
   });
@@ -252,10 +256,14 @@ export async function chatWithTools(
   apiKey: string,
   visiblePeriod?: Parameters<typeof buildChatUserPrompt>[4],
   coachNotes: CoachNote[] = [],
+  allTrainingDays?: Record<string, import('@/types/training').DayData>,
 ) {
   const coachNotesContext = buildCoachNotesPromptSection(coachNotes);
-  const historySummaries = trainingLog?.length
-    ? buildSummariesFromTrainingLog(trainingLog)
+  const daysRecord =
+    allTrainingDays ??
+    Object.fromEntries((trainingLog ?? []).map((day) => [day.date, day]));
+  const historySummaries = Object.keys(daysRecord).length
+    ? buildAiContextSummaries(daysRecord)
     : undefined;
 
   const result = await generateText({
@@ -334,7 +342,11 @@ export async function chatWithLlmStructured(
   userMetrics: Parameters<typeof buildChatUserPrompt>[2],
   apiKey: string,
   visiblePeriod?: Parameters<typeof buildChatUserPrompt>[4],
+  allTrainingDays?: Record<string, import('@/types/training').DayData>,
 ) {
+  const daysRecord =
+    allTrainingDays ??
+    Object.fromEntries((trainingLog ?? []).map((day) => [day.date, day]));
   const { object } = await generateObject({
     model: createOpenAiModel(apiKey),
     schema: chatResponseSchema,
@@ -348,7 +360,7 @@ Pokud sportovec žádá úpravu plánu, vyplň calendarActions. Jinak vrať prá
       userMetrics,
       methodicContext,
       visiblePeriod,
-      trainingLog?.length ? buildSummariesFromTrainingLog(trainingLog) : undefined,
+      Object.keys(daysRecord).length ? buildAiContextSummaries(daysRecord) : undefined,
     ),
     temperature: 0.2,
   });

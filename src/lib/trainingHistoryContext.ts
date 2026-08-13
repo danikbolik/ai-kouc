@@ -1,5 +1,6 @@
 import { addDaysToDate, formatDateKey, getTodayDate, parseDate } from './dates';
 import { getActivities, normalizeDayData } from './dayData';
+import { formatWorkoutExtrasForAi } from './workoutExtras';
 import {
   formatStravaActualDetailsForAi,
   summarizeStravaActualForAi,
@@ -195,7 +196,7 @@ export function buildUpcomingPlanSummary(
       const hrPart = w.targetHR ? `TF ${w.targetHR}` : '';
       totalPlannedKm += w.distanceKm ?? 0;
       lines.push(
-        `- ${date} [${w.phase}] ${w.title} (${w.type}) | ${[kmPart, pacePart, hrPart].filter(Boolean).join(' ')}${w.isLocked ? ' 🔒' : ''}`,
+        `- ${date} [${w.phase}] ${w.title} (${w.type}) | ${[kmPart, pacePart, hrPart].filter(Boolean).join(' ')}${w.isLocked ? ' 🔒' : ''}${formatWorkoutExtrasForAi(w)}`,
       );
     }
   }

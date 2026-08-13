@@ -105,16 +105,9 @@ export function generateMockReply(
 
   if (normalized.includes('týden') || normalized.includes('únava') || normalized.includes('vyhodnoť')) {
     const weekDays = getLastWeekDays(days);
-    const rpeValues = weekDays
-      .map((d) => d.feedback?.rpe)
-      .filter((v): v is number => v !== undefined);
     const readinessValues = weekDays
       .map((d) => d.feedback?.readinessScore)
       .filter((v): v is number => v !== undefined);
-    const avgRpe =
-      rpeValues.length > 0
-        ? (rpeValues.reduce((a, b) => a + b, 0) / rpeValues.length).toFixed(1)
-        : 'N/A';
     const totalKm = weekDays.reduce((sum, d) => {
       const normalized = normalizeDayData(d);
       const fromActivities = normalized.activities.reduce((s, a) => s + a.distanceKm, 0);
@@ -127,24 +120,23 @@ export function generateMockReply(
     }, 0);
 
     const daySummaries = weekDays
-      .map((d) => `- **${d.date}**: ${formatSessionSummary(d)}${d.feedback?.rpe ? `, RPE ${d.feedback.rpe}` : ''}`)
+      .map((d) => `- **${d.date}**: ${formatSessionSummary(d)}`)
       .join('\n');
+
+    const lastReadiness = readinessValues.length > 0 ? readinessValues[readinessValues.length - 1] : null;
 
     return {
       text: [
         '### Vyhodnocení posledního týdne',
         '',
         '**Shrnutí objemu:** ~' + totalKm.toFixed(0) + ' km za 7 dní',
-        '**Průměrné RPE:** ' + avgRpe + '/10',
-        readinessValues.length > 0
-          ? '**Readiness:** Poslední hodnota ' + readinessValues[readinessValues.length - 1] + '/10'
-          : '',
+        lastReadiness !== null ? '**Readiness:** Poslední hodnota ' + lastReadiness + '/10' : '',
         '',
         '**Denní přehled:**',
         daySummaries,
         '',
-        avgRpe !== 'N/A' && Number(avgRpe) >= 7
-          ? '⚠️ Průměrné RPE je elevované. Doporučuji **lehčí regenerační týden** nebo snížení objemu o 15–20 %.'
+        lastReadiness !== null && lastReadiness >= 8
+          ? '⚠️ Elevovaná ranní únava. Doporučuji **lehčí regenerační týden** nebo snížení objemu o 15–20 %.'
           : '✅ Týden vypadá vyváženě. Pokračuj v aktuálním plánu s pozorností na signály únavy.',
         '',
         weekDays.some((d) => d.feedback?.userComment)
@@ -199,7 +191,7 @@ export function generateMockReply(
       '',
       '- 📚 Indexované knihy: *Daniels\' Running Formula*, *Training for the Uphill Athlete*',
       '- 📅 14 dní tréninkové historie + aktuální plán',
-      '- 💬 Tvůj feedback (RPE, readiness, komentáře)',
+      '- 💬 Tvůj feedback (readiness, komentáře)',
       '',
       'Zeptej se mě na konkrétní trénink, vyhodnocení týdne, nebo úpravu plánu. Použij rychlé dotazy níže pro inspiraci.',
     ].join('\n'),

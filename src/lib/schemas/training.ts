@@ -69,10 +69,20 @@ export const workoutSessionSchema = z.object({
   actual: actualSchema,
 });
 
+export const warmCoolSegmentSchema = z.object({
+  value: z.coerce.number().min(0),
+  unit: z.enum(['km', 'min']),
+});
+
+export const raceDetailsSchema = z.object({
+  durationMin: z.coerce.number().min(0).optional().nullable(),
+  distanceValue: z.coerce.number().min(0).optional().nullable(),
+  distanceUnit: z.enum(['km', 'm']).optional().nullable(),
+  raceType: z.enum(['ob', 'kros', 'track_road']).optional().nullable(),
+});
+
 export const dayFeedbackSchema = z.object({
-  rpe: z.coerce.number().min(1).max(10).optional().nullable(),
   readinessScore: z.coerce.number().min(1).max(10).optional().nullable(),
-  sleepQuality: z.coerce.number().min(1).max(10).optional().nullable(),
   userComment: z.string().optional().nullable(),
 });
 
@@ -98,6 +108,9 @@ export const workoutPlanItemSchema = z.object({
   targetHR: z.coerce.number().optional().nullable(),
   description: z.string().optional().nullable().default(''),
   intervals: z.array(workoutIntervalSchema).optional().nullable(),
+  warmUp: warmCoolSegmentSchema.optional().nullable(),
+  coolDown: warmCoolSegmentSchema.optional().nullable(),
+  raceDetails: raceDetailsSchema.optional().nullable(),
   bookReference: bookReferenceSchema,
 });
 
@@ -112,6 +125,9 @@ export const plannedWorkoutSchema = z.object({
   targetHR: z.coerce.number().optional().nullable(),
   description: z.string().optional().nullable().default(''),
   intervals: z.array(workoutIntervalSchema).optional().nullable(),
+  warmUp: warmCoolSegmentSchema.optional().nullable(),
+  coolDown: warmCoolSegmentSchema.optional().nullable(),
+  raceDetails: raceDetailsSchema.optional().nullable(),
   bookReference: bookReferenceSchema,
 });
 

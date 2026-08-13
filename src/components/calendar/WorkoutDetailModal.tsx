@@ -202,8 +202,6 @@ export function WorkoutDetailModal() {
 
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [readinessScore, setReadinessScore] = useState(5);
-  const [sleepQuality, setSleepQuality] = useState(7);
-  const [rpe, setRpe] = useState(5);
   const [userComment, setUserComment] = useState('');
 
   useEffect(() => {
@@ -214,8 +212,6 @@ export function WorkoutDetailModal() {
     setActiveSessionId(initialSessionId);
 
     setReadinessScore(dayData?.feedback?.readinessScore ?? 5);
-    setSleepQuality(dayData?.feedback?.sleepQuality ?? 7);
-    setRpe(dayData?.feedback?.rpe ?? 5);
     setUserComment(dayData?.feedback?.userComment ?? '');
 
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -235,21 +231,19 @@ export function WorkoutDetailModal() {
 
   const activeSession = sessions.find((s) => s.id === activeSessionId) ?? sessions[0];
   const showReadiness = timeState === 'today';
-  const showRpeFeedback = timeState === 'past' || timeState === 'today';
+  const showCommentFeedback = timeState === 'past' || timeState === 'today';
   const showRecalculate = showReadiness && readinessScore >= 8;
 
   const handleSaveFeedback = () => {
     updateFeedback(selectedDate, {
       readinessScore: showReadiness ? readinessScore : dayData?.feedback?.readinessScore,
-      sleepQuality: showReadiness ? sleepQuality : dayData?.feedback?.sleepQuality,
-      rpe: showRpeFeedback ? rpe : dayData?.feedback?.rpe,
       userComment: userComment || undefined,
     });
     closeDetailModal();
   };
 
   const handleRecalculate = async () => {
-    updateFeedback(selectedDate, { readinessScore, sleepQuality });
+    updateFeedback(selectedDate, { readinessScore });
     await recalculatePlan(selectedDate);
   };
 
@@ -361,25 +355,6 @@ export function WorkoutDetailModal() {
                   </div>
                 </label>
 
-                <label className="block">
-                  <div className="mb-2 flex items-center justify-between">
-                    <span className="text-sm font-medium text-slate-700">Kvalita spánku</span>
-                    <span className="text-sm font-bold text-slate-900">{sleepQuality}/10</span>
-                  </div>
-                  <input
-                    type="range"
-                    min={1}
-                    max={10}
-                    value={sleepQuality}
-                    onChange={(e) => setSleepQuality(Number(e.target.value))}
-                    className="h-2 w-full cursor-pointer accent-emerald-600"
-                  />
-                  <div className="mt-1 flex justify-between text-[10px] text-slate-400">
-                    <span>1 – Špatný</span>
-                    <span>10 – Výborný</span>
-                  </div>
-                </label>
-
                 {showRecalculate && (
                   <button
                     type="button"
@@ -396,48 +371,23 @@ export function WorkoutDetailModal() {
             </section>
           )}
 
-          {/* Sekce 3: RPE & Komentář */}
-          {showRpeFeedback && (
+          {/* Sekce 3: Komentář */}
+          {showCommentFeedback && (
             <section className="rounded-xl border border-slate-200 p-4">
               <h3 className="mb-4 text-xs font-semibold uppercase tracking-wide text-slate-500">
                 Zpětná vazba k tréninku
               </h3>
 
-              <div className="space-y-4">
-                <label className="block">
-                  <div className="mb-2 flex items-center justify-between">
-                    <span className="text-sm font-medium text-slate-700">
-                      RPE – vnímané úsilí
-                    </span>
-                    <span className="text-sm font-bold text-slate-900">{rpe}/10</span>
-                  </div>
-                  <input
-                    type="range"
-                    min={1}
-                    max={10}
-                    value={rpe}
-                    onChange={(e) => setRpe(Number(e.target.value))}
-                    className="h-2 w-full cursor-pointer accent-slate-700"
-                  />
-                  <div className="mt-1 flex justify-between text-[10px] text-slate-400">
-                    <span>1 – Velmi lehké</span>
-                    <span>10 – Maximální</span>
-                  </div>
-                </label>
-
-                <label className="block">
-                  <span className="mb-1 block text-sm font-medium text-slate-700">
-                    Komentář
-                  </span>
-                  <textarea
-                    value={userComment}
-                    onChange={(e) => setUserComment(e.target.value)}
-                    rows={3}
-                    placeholder='Např. "Cítil jsem zatuhlé achilovky"'
-                    className="w-full resize-none rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 outline-none ring-emerald-500 focus:ring-2"
-                  />
-                </label>
-              </div>
+              <label className="block">
+                <span className="mb-1 block text-sm font-medium text-slate-700">Komentář</span>
+                <textarea
+                  value={userComment}
+                  onChange={(e) => setUserComment(e.target.value)}
+                  rows={3}
+                  placeholder='Např. "Cítil jsem zatuhlé achilovky"'
+                  className="w-full resize-none rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 outline-none ring-emerald-500 focus:ring-2"
+                />
+              </label>
             </section>
           )}
         </div>
@@ -476,7 +426,7 @@ export function WorkoutDetailModal() {
             >
               Zavřít
             </button>
-            {(showReadiness || showRpeFeedback) && (
+            {(showReadiness || showCommentFeedback) && (
               <button
                 type="button"
                 onClick={handleSaveFeedback}

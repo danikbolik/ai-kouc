@@ -1,5 +1,5 @@
 import type { CalendarAction, WorkoutPlanItem } from '../types/api';
-import type { DayData, PlannedWorkout, WorkoutInterval } from '../types/training';
+import type { DayData, PlannedWorkout, RaceDetails, WarmCoolSegment, WorkoutInterval } from '../types/training';
 import { emptyDay, mergeActivitiesForDay, normalizeDayData } from './dayData';
 
 function stripNull<T>(value: T | null | undefined): T | undefined {
@@ -27,6 +27,14 @@ type PlannedWorkoutInput = {
   targetHR?: number | null;
   description?: string | null;
   intervals?: IntervalInput[] | null;
+  warmUp?: { value: number; unit: WarmCoolSegment['unit'] } | null;
+  coolDown?: { value: number; unit: WarmCoolSegment['unit'] } | null;
+  raceDetails?: {
+    durationMin?: number | null;
+    distanceValue?: number | null;
+    distanceUnit?: 'km' | 'm' | null;
+    raceType?: RaceDetails['raceType'] | null;
+  } | null;
   bookReference?:
     | {
         bookTitle?: string | null;
@@ -35,6 +43,30 @@ type PlannedWorkoutInput = {
       }
     | null;
 };
+
+function normalizeWarmCool(segment?: WarmCoolSegment | null): WarmCoolSegment | undefined {
+  if (!segment?.value || segment.value <= 0) return undefined;
+  return { value: segment.value, unit: segment.unit };
+}
+
+function normalizeRaceDetails(
+  details?: PlannedWorkoutInput['raceDetails'],
+): RaceDetails | undefined {
+  if (!details) return undefined;
+  const durationMin = stripNull(details.durationMin);
+  const distanceValue = stripNull(details.distanceValue);
+  const hasData =
+    (durationMin !== undefined && durationMin > 0) ||
+    (distanceValue !== undefined && distanceValue > 0) ||
+    Boolean(details.raceType);
+  if (!hasData) return undefined;
+  return {
+    durationMin,
+    distanceValue,
+    distanceUnit: stripNull(details.distanceUnit),
+    raceType: stripNull(details.raceType),
+  };
+}
 
 export function normalizePlannedWorkout(workout: PlannedWorkoutInput): PlannedWorkout {
   const bookRef = workout.bookReference;
@@ -63,6 +95,9 @@ export function normalizePlannedWorkout(workout: PlannedWorkoutInput): PlannedWo
           recoveryUnit: stripNull(interval.recoveryUnit),
         }))
       : undefined,
+    warmUp: normalizeWarmCool(workout.warmUp),
+    coolDown: normalizeWarmCool(workout.coolDown),
+    raceDetails: normalizeRaceDetails(workout.raceDetails),
     bookReference: hasBookRef
       ? {
           bookTitle: bookRef.bookTitle ?? '',
@@ -85,6 +120,9 @@ export function workoutPlanItemToPlannedWorkout(item: WorkoutPlanItem): PlannedW
     targetHR: item.targetHR,
     description: item.description ?? '',
     intervals: item.intervals,
+    warmUp: item.warmUp,
+    coolDown: item.coolDown,
+    raceDetails: item.raceDetails,
     bookReference: item.bookReference,
   });
 }

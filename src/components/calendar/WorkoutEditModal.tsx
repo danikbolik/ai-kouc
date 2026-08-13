@@ -11,8 +11,15 @@ import {
   createDefaultInterval,
   estimateIntervalDistanceKm,
 } from '../../lib/intervalBuilder';
+import { needsWarmUpCoolDown, RACE_TYPE_OPTIONS } from '../../lib/workoutExtras';
 import { useTrainingStore } from '../../store/useTrainingStore';
-import type { ActivityType, PlannedWorkout, WorkoutInterval } from '../../types/training';
+import type {
+  ActivityType,
+  PlannedWorkout,
+  RaceDetails,
+  WarmCoolSegment,
+  WorkoutInterval,
+} from '../../types/training';
 import { IntervalBuilder } from './IntervalBuilder';
 
 const ACTIVITY_TYPES: { value: ActivityType; label: string }[] = [
@@ -27,6 +34,51 @@ const ACTIVITY_TYPES: { value: ActivityType; label: string }[] = [
 ];
 
 const PHASES: PlannedWorkout['phase'][] = ['AM', 'PM', 'EVENING'];
+
+function defaultWarmCool(): WarmCoolSegment {
+  return { value: 2, unit: 'km' };
+}
+
+function defaultRaceDetails(): RaceDetails {
+  return { durationMin: 60, distanceValue: 10, distanceUnit: 'km', raceType: 'track_road' };
+}
+
+function WarmCoolField({
+  label,
+  segment,
+  onChange,
+}: {
+  label: string;
+  segment: WarmCoolSegment;
+  onChange: (next: WarmCoolSegment) => void;
+}) {
+  return (
+    <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+      <span className="mb-2 block text-xs font-semibold uppercase text-slate-500">{label}</span>
+      <div className="grid grid-cols-2 gap-2">
+        <input
+          type="number"
+          min="0"
+          step="0.1"
+          value={segment.value || ''}
+          onChange={(e) =>
+            onChange({ ...segment, value: e.target.value ? Number(e.target.value) : 0 })
+          }
+          placeholder="Hodnota"
+          className="rounded-lg border border-slate-200 px-3 py-2 text-sm"
+        />
+        <select
+          value={segment.unit}
+          onChange={(e) => onChange({ ...segment, unit: e.target.value as WarmCoolSegment['unit'] })}
+          className="rounded-lg border border-slate-200 px-3 py-2 text-sm"
+        >
+          <option value="km">km</option>
+          <option value="min">min</option>
+        </select>
+      </div>
+    </div>
+  );
+}
 
 export function WorkoutEditModal() {
   const isOpen = useTrainingStore((s) => s.isEditModalOpen);
@@ -47,7 +99,14 @@ export function WorkoutEditModal() {
       ? getPlannedWorkouts(day).find((w) => w.id === editSessionId)
       : undefined;
     const nextForm = workout ?? createEmptyPlannedWorkout(selectedDate);
-    setForm(nextForm);
+    setForm({
+      ...nextForm,
+      warmUp: nextForm.warmUp ?? (needsWarmUpCoolDown(nextForm.type) ? defaultWarmCool() : undefined),
+      coolDown:
+        nextForm.coolDown ?? (needsWarmUpCoolDown(nextForm.type) ? defaultWarmCool() : undefined),
+      raceDetails:
+        nextForm.type === 'race' ? (nextForm.raceDetails ?? defaultRaceDetails()) : nextForm.raceDetails,
+    });
     setInterval(nextForm.intervals?.[0] ?? createDefaultInterval());
   }, [isOpen, selectedDate, editSessionId, days]);
 
@@ -68,6 +127,8 @@ export function WorkoutEditModal() {
 
   const isEditing = Boolean(editSessionId);
   const isIntervalWorkout = form.type === 'intervals';
+  const showWarmCool = needsWarmUpCoolDown(form.type);
+  const showRaceFields = form.type === 'race';
 
   const applyIntervalToForm = (nextInterval: WorkoutInterval) => {
     setForm({
@@ -82,13 +143,25 @@ export function WorkoutEditModal() {
   };
 
   const handleTypeChange = (type: ActivityType) => {
+    const warmCoolDefaults = needsWarmUpCoolDown(type)
+      ? { warmUp: form.warmUp ?? defaultWarmCool(), coolDown: form.coolDown ?? defaultWarmCool() }
+      : { warmUp: undefined, coolDown: undefined };
+
     if (type === 'intervals') {
       const nextInterval = form.intervals?.[0] ?? interval;
       setInterval(nextInterval);
       applyIntervalToForm(nextInterval);
+      setForm((prev) => ({ ...prev, ...warmCoolDefaults }));
       return;
     }
-    setForm({ ...form, type, intervals: undefined });
+
+    setForm({
+      ...form,
+      type,
+      intervals: undefined,
+      ...warmCoolDefaults,
+      raceDetails: type === 'race' ? (form.raceDetails ?? defaultRaceDetails()) : undefined,
+    });
   };
 
   const handleSave = () => {
@@ -179,6 +252,98 @@ export function WorkoutEditModal() {
             </label>
           </div>
 
+          {showRaceFields && (
+            <div className="space-y-3 rounded-xl border border-rose-200 bg-rose-50/50 p-4">
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-rose-800">
+                Specifikace závodu
+              </h3>
+              <div className="grid grid-cols-2 gap-3">
+                <label className="block">
+                  <span className="mb-1 block text-xs font-medium text-slate-600">
+                    Trvání (min)
+                  </span>
+                  <input
+                    type="number"
+                    min="1"
+                    value={form.raceDetails?.durationMin ?? ''}
+                    onChange={(e) =>
+                      setForm({
+                        ...form,
+                        raceDetails: {
+                          ...form.raceDetails,
+                          durationMin: e.target.value ? Number(e.target.value) : undefined,
+                        },
+                      })
+                    }
+                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                  />
+                </label>
+                <label className="block">
+                  <span className="mb-1 block text-xs font-medium text-slate-600">Typ závodu</span>
+                  <select
+                    value={form.raceDetails?.raceType ?? 'track_road'}
+                    onChange={(e) =>
+                      setForm({
+                        ...form,
+                        raceDetails: {
+                          ...form.raceDetails,
+                          raceType: e.target.value as RaceDetails['raceType'],
+                        },
+                      })
+                    }
+                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                  >
+                    {RACE_TYPE_OPTIONS.map((opt) => (
+                      <option key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <label className="block">
+                  <span className="mb-1 block text-xs font-medium text-slate-600">Vzdálenost</span>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.1"
+                    value={form.raceDetails?.distanceValue ?? ''}
+                    onChange={(e) =>
+                      setForm({
+                        ...form,
+                        raceDetails: {
+                          ...form.raceDetails,
+                          distanceValue: e.target.value ? Number(e.target.value) : undefined,
+                        },
+                      })
+                    }
+                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                  />
+                </label>
+                <label className="block">
+                  <span className="mb-1 block text-xs font-medium text-slate-600">Jednotka</span>
+                  <select
+                    value={form.raceDetails?.distanceUnit ?? 'km'}
+                    onChange={(e) =>
+                      setForm({
+                        ...form,
+                        raceDetails: {
+                          ...form.raceDetails,
+                          distanceUnit: e.target.value as 'km' | 'm',
+                        },
+                      })
+                    }
+                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                  >
+                    <option value="km">km</option>
+                    <option value="m">m</option>
+                  </select>
+                </label>
+              </div>
+            </div>
+          )}
+
           {isIntervalWorkout ? (
             <IntervalBuilder
               interval={interval}
@@ -235,6 +400,21 @@ export function WorkoutEditModal() {
                   className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
                 />
               </label>
+            </div>
+          )}
+
+          {showWarmCool && (
+            <div className="grid grid-cols-2 gap-3">
+              <WarmCoolField
+                label="Rozklus"
+                segment={form.warmUp ?? defaultWarmCool()}
+                onChange={(warmUp) => setForm({ ...form, warmUp })}
+              />
+              <WarmCoolField
+                label="Výklus"
+                segment={form.coolDown ?? defaultWarmCool()}
+                onChange={(coolDown) => setForm({ ...form, coolDown })}
+              />
             </div>
           )}
 

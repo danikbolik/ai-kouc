@@ -1,4 +1,5 @@
 import { buildIntervalDescription } from '@/lib/intervalBuilder';
+import { formatWorkoutExtrasForAi } from '@/lib/workoutExtras';
 import { dayToLegacySessions, normalizeDayData } from '@/lib/dayData';
 import {
   formatStravaActualDetailsForAi,
@@ -51,6 +52,7 @@ function formatPlannedWorkoutLine(workout: PlannedWorkout): string {
   }
 
   if (workout.isLocked) line += ' 🔒 LOCKED';
+  line += formatWorkoutExtrasForAi(workout);
   return line;
 }
 
@@ -94,8 +96,6 @@ function formatFeedbackLine(day: DayData): string {
 
   const parts: string[] = [];
   if (fb.readinessScore !== undefined) parts.push(`readiness=${fb.readinessScore}/10`);
-  if (fb.rpe !== undefined) parts.push(`RPE=${fb.rpe}/10`);
-  if (fb.sleepQuality !== undefined) parts.push(`spánek=${fb.sleepQuality}/10`);
   if (fb.userComment) parts.push(`komentář: "${fb.userComment}"`);
 
   return parts.length > 0 ? `Feedback: ${parts.join(', ')}` : '';
@@ -166,7 +166,7 @@ ${buildUserProfileContext(request.userMetrics, request.readinessScore)}
 ## Metodický RAG kontext (JEDINÝ povolený zdroj teorie – nehalucinuj mimo něj)
 ${methodicContext}
 
-## Historie kalendáře – posledních 14 dní (RPE, km, readiness, actual data)
+## Historie kalendáře – posledních 14 dní (km, readiness, actual data)
 Celkový objem za období: ~${totalKm.toFixed(1)} km
 
 ${calendarContext}
@@ -234,8 +234,9 @@ ${calendarContext}
 1. Porovnej nadcházející plán s reálnou historií ze Stravy – hledaj nebezpečné skoky v objemu, délce longrunu a chybějící regeneraci.
 2. Pokud detekuješ chybu, varuj ostře a věcně s fyziologickým odůvodněním.
 3. Při korekci plánu VŽDY zavolej create_workout_plan – tréninky se automaticky zapíší do kalendáře.
-4. V textu uveď konkrétní změny (např. „Úterý: změněno z 15×500m na 8 km Z2 regenerace").
-5. Zamčené tréninky (isLocked) neměň ani nemaž.
+4. U intervalů, tempa a závodů vyplň warmUp/coolDown; u závodů raceDetails pro správný tapering.
+5. V textu uveď konkrétní změny (např. „Úterý: změněno z 15×500m na 8 km Z2 regenerace").
+6. Zamčené tréninky (isLocked) neměň ani nemaž.
 `.trim();
 }
 

@@ -142,18 +142,11 @@ export function DayCard({ date, dayData, viewDate, isCompact = false }: DayCardP
         )}
       </div>
 
-      {(feedback?.readinessScore !== undefined || feedback?.rpe !== undefined) && (
+      {feedback?.readinessScore !== undefined && (
         <div className="flex flex-wrap gap-1 border-t border-slate-100 px-2 py-1">
-          {feedback.readinessScore !== undefined && (
-            <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[9px] font-medium text-slate-600">
-              Únava: {feedback.readinessScore}/10
-            </span>
-          )}
-          {feedback.rpe !== undefined && (
-            <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[9px] font-medium text-slate-600">
-              RPE: {feedback.rpe}
-            </span>
-          )}
+          <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[9px] font-medium text-slate-600">
+            Únava: {feedback.readinessScore}/10
+          </span>
         </div>
       )}
     </button>

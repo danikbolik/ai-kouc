@@ -89,9 +89,7 @@ function normalizeUpdatedDays(
   for (const [date, day] of Object.entries(days)) {
     const feedback = day.feedback
       ? {
-          rpe: stripNull(day.feedback.rpe),
           readinessScore: stripNull(day.feedback.readinessScore),
-          sleepQuality: stripNull(day.feedback.sleepQuality),
           userComment: stripNull(day.feedback.userComment),
         }
       : undefined;
@@ -274,7 +272,7 @@ export async function chatWithTools(
     tools: {
       create_workout_plan: tool({
         description:
-          'Vloží nebo OPRAVÍ plánované tréninky přímo v kalendáři. POVINNÉ při návrhu plánu, korekci chyb nebo nahrazení nebezpečného tréninku (např. intervaly → regenerace). Uveď konkrétní opravy s datem, typem a popisem změny – kalendář se aktualizuje automaticky.',
+          'Vloží nebo OPRAVÍ plánované tréninky přímo v kalendáři. POVINNÉ při návrhu plánu, korekci chyb nebo nahrazení nebezpečného tréninku. U intervalů/tempa/závodů vyplň warmUp a coolDown (value + unit km|min). U závodů vyplň raceDetails (durationMin, distanceValue, distanceUnit, raceType: ob|kros|track_road).',
         parameters: z.object({
           workouts: z.array(workoutPlanItemSchema).min(1),
         }),

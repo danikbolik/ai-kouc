@@ -55,6 +55,9 @@ export interface WorkoutPlanItem {
   targetHR?: number;
   description?: string;
   intervals?: import('./training').WorkoutInterval[];
+  warmUp?: import('./training').WarmCoolSegment;
+  coolDown?: import('./training').WarmCoolSegment;
+  raceDetails?: import('./training').RaceDetails;
   bookReference?: {
     bookTitle: string;
     chapterOrPage: string;
@@ -75,7 +78,7 @@ export type CalendarAction =
 export const RECALCULATE_SYSTEM_PROMPT = `Jsi výhradně metodický analytik a trenér vytrvalostních sportů.
 Tvým úkolem je přepočítat tréninkový plán na základě:
 - Poskytnutého metodického kontextu (výňatky z knížek v RAG).
-- Historie v kalendáři (RPE, odtrénované km, ranní únava readinessScore).
+- Historie v kalendáři (odtrénované km, ranní únava readinessScore).
 - Osobních metrik sportovce (HRmax, prahy).
 
 STRIKTNÍ PRAVIDLA:
@@ -141,6 +144,8 @@ Pokud najdeš chyby v plánu a sportovec žádá úpravu NEBO plán je evidentn�
 
 ## Další pravidla
 - Vyhodnocuj odchylky reálných běhů od plánu a tempových zón
+- U intervalů, tempa a závodů vyplň warmUp (rozklus) a coolDown (výklus) – km nebo min
+- U závodů vyplň raceDetails: durationMin, distanceValue + distanceUnit (km/m), raceType (ob/kros/track_road) – použij pro tapering
 - U intervalů vyplň pole intervals + description
 - Dvoufázový trénink = 2 položky se stejným date, různá phase (AM/PM/EVENING)
 - Zamčené tréninky (isLocked: true) neměň ani nemaž

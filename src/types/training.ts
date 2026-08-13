@@ -26,6 +26,24 @@ export type IntervalSegmentUnit = 'm' | 'km' | 'min';
 
 export type IntervalRecoveryUnit = 'min' | 'm' | 'km';
 
+export type WarmCoolUnit = 'km' | 'min';
+
+/** Rozklus nebo výklus – vzdálenost (km) nebo čas (min) */
+export interface WarmCoolSegment {
+  value: number;
+  unit: WarmCoolUnit;
+}
+
+export type RaceType = 'ob' | 'kros' | 'track_road';
+
+/** Specifikace závodu pro tapering a periodizaci */
+export interface RaceDetails {
+  durationMin?: number;
+  distanceValue?: number;
+  distanceUnit?: 'km' | 'm';
+  raceType?: RaceType;
+}
+
 
 
 /** Strukturovaný interval pro builder */
@@ -140,6 +158,12 @@ export interface PlannedWorkout {
 
   intervals?: WorkoutInterval[];
 
+  warmUp?: WarmCoolSegment;
+
+  coolDown?: WarmCoolSegment;
+
+  raceDetails?: RaceDetails;
+
   bookReference?: {
 
     bookTitle: string;
@@ -224,13 +248,15 @@ export interface DayData {
 
   feedback?: {
 
-    rpe?: number;
-
     readinessScore?: number;
 
-    sleepQuality?: number;
-
     userComment?: string;
+
+    /** @deprecated – odstraněno z UI */
+    rpe?: number;
+
+    /** @deprecated – odstraněno z UI */
+    sleepQuality?: number;
 
   };
 

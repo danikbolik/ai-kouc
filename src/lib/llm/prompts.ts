@@ -192,13 +192,22 @@ export function buildChatUserPrompt(
   userMetrics?: UserMetrics,
   methodicContext?: string,
   visiblePeriod?: { from: string; to: string },
+  historySummaries?: {
+    stravaHistorySummary: string;
+    upcomingPlanSummary: string;
+    planComparisonSummary: string;
+  },
 ): string {
   const sortedLog = [...(trainingLog ?? [])].sort((a, b) => a.date.localeCompare(b.date));
 
   const calendarContext = buildFullCalendarContext(sortedLog);
   const periodLine = visiblePeriod
-    ? `Období zobrazené v kalendáři: ${visiblePeriod.from} až ${visiblePeriod.to}`
-    : 'Období kalendáře: posledních 14 dní + budoucí plán';
+    ? `Období kontextu: ${visiblePeriod.from} až ${visiblePeriod.to} (historie + budoucí plán)`
+    : 'Období kalendáře: posledních 30 dní + nadcházející 3 týdny';
+
+  const stravaBlock = historySummaries?.stravaHistorySummary ?? '';
+  const upcomingBlock = historySummaries?.upcomingPlanSummary ?? '';
+  const comparisonBlock = historySummaries?.planComparisonSummary ?? '';
 
   return `
 ## Dotaz sportovce
@@ -207,19 +216,26 @@ ${message}
 ## Profil sportovce
 ${userMetrics ? buildUserProfileContext(userMetrics) : 'N/A'}
 
-## Metodický RAG kontext (kombinuj všechny zdroje – lokální soubory, nahrané podklady, vestavěná knihovna)
+${stravaBlock}
+
+${upcomingBlock}
+
+${comparisonBlock}
+
+## Metodický RAG kontext (MULTI-SOURCE – syntetizuj minimálně 2–3 různé zdroje v každé odpovědi)
 ${methodicContext ?? 'Kontext nedostupný – odpověz, že chybí metodické podklady.'}
 
-## Tréninkový kalendář – plánované i odtrénované tréninky
+## Tréninkový kalendář – plánované i odtrénované tréninky (detail)
 ${periodLine}
 
 ${calendarContext}
 
-## Nástroje pro úpravu kalendáře
-Pokud sportovec žádá naplánování, úpravu nebo doplnění tréninků, VŽDY zavolej funkci create_workout_plan.
-Tréninky se automaticky zapíší do kalendáře – nepopisuj plán pouze v textu bez volání nástroje.
-Každý trénink: date (YYYY-MM-DD), phase (AM/PM/EVENING), title, type, description; u intervalů vyplň intervals.
-Zamčené tréninky (isLocked) neměň ani nemaž.
+## Instrukce pro analýzu
+1. Porovnej nadcházející plán s reálnou historií ze Stravy – hledaj nebezpečné skoky v objemu, délce longrunu a chybějící regeneraci.
+2. Pokud detekuješ chybu, varuj ostře a věcně s fyziologickým odůvodněním.
+3. Při korekci plánu VŽDY zavolej create_workout_plan – tréninky se automaticky zapíší do kalendáře.
+4. V textu uveď konkrétní změny (např. „Úterý: změněno z 15×500m na 8 km Z2 regenerace").
+5. Zamčené tréninky (isLocked) neměň ani nemaž.
 `.trim();
 }
 

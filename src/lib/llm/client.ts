@@ -13,6 +13,7 @@ import {
   buildRecalculateUserPrompt,
   enforceLockedSessions,
 } from '@/lib/llm/prompts';
+import { buildSummariesFromTrainingLog } from '@/lib/trainingHistoryContext';
 import { buildRecalculateRagContext } from '@/lib/ragKnowledge';
 import { adaptTrainingPlan } from '@/lib/planAdaptation';
 import {
@@ -233,7 +234,14 @@ export function streamChatWithLlm(
   return streamText({
     model: createOpenAiModel(apiKey),
     system: buildLlmSystemPrompt(CHAT_SYSTEM_PROMPT, methodicContext),
-    prompt: buildChatUserPrompt(message, trainingLog, userMetrics, methodicContext, visiblePeriod),
+    prompt: buildChatUserPrompt(
+      message,
+      trainingLog,
+      userMetrics,
+      methodicContext,
+      visiblePeriod,
+      trainingLog?.length ? buildSummariesFromTrainingLog(trainingLog) : undefined,
+    ),
     temperature: 0.2,
   });
 }
@@ -248,15 +256,25 @@ export async function chatWithTools(
   coachNotes: CoachNote[] = [],
 ) {
   const coachNotesContext = buildCoachNotesPromptSection(coachNotes);
+  const historySummaries = trainingLog?.length
+    ? buildSummariesFromTrainingLog(trainingLog)
+    : undefined;
 
   const result = await generateText({
     model: createOpenAiModel(apiKey),
     system: buildLlmSystemPrompt(CHAT_SYSTEM_PROMPT, methodicContext, coachNotesContext),
-    prompt: buildChatUserPrompt(message, trainingLog, userMetrics, methodicContext, visiblePeriod),
+    prompt: buildChatUserPrompt(
+      message,
+      trainingLog,
+      userMetrics,
+      methodicContext,
+      visiblePeriod,
+      historySummaries,
+    ),
     tools: {
       create_workout_plan: tool({
         description:
-          'Vloží plánované tréninky přímo do kalendáře sportovce. POVINNÉ při každém návrhu nebo úpravě tréninkového plánu – tréninky se automaticky synchronizují do kalendáře.',
+          'Vloží nebo OPRAVÍ plánované tréninky přímo v kalendáři. POVINNÉ při návrhu plánu, korekci chyb nebo nahrazení nebezpečného tréninku (např. intervaly → regenerace). Uveď konkrétní opravy s datem, typem a popisem změny – kalendář se aktualizuje automaticky.',
         parameters: z.object({
           workouts: z.array(workoutPlanItemSchema).min(1),
         }),
@@ -326,7 +344,14 @@ export async function chatWithLlmStructured(
 
 Vrať references POUZE z přiloženého metodického kontextu. Pokud kontext nestačí, references může být prázdné pole a replyText musí obsahovat větu o nedostatečných podkladech.
 Pokud sportovec žádá úpravu plánu, vyplň calendarActions. Jinak vrať prázdné pole calendarActions.`,
-    prompt: buildChatUserPrompt(message, trainingLog, userMetrics, methodicContext, visiblePeriod),
+    prompt: buildChatUserPrompt(
+      message,
+      trainingLog,
+      userMetrics,
+      methodicContext,
+      visiblePeriod,
+      trainingLog?.length ? buildSummariesFromTrainingLog(trainingLog) : undefined,
+    ),
     temperature: 0.2,
   });
 

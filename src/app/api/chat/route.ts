@@ -8,24 +8,16 @@ import {
 } from '@/lib/llm/client';
 import { buildMethodicContext } from '@/lib/methodologyContext';
 import { getMethodologyContext } from '@/lib/getMethodologyContext';
-import { chunksToReferences, searchKnowledge } from '@/lib/ragKnowledge';
+import { chunksToReferences, CHAT_RAG_TOP_K, searchKnowledge } from '@/lib/ragKnowledge';
 import { resolveOpenAiKey } from '@/lib/resolveApiKeys';
 import type { ChatRequest } from '@/types/api';
 import type { DayData } from '@/types/training';
 
-function normalizeTrainingLog(trainingLog?: DayData[], visiblePeriod?: { from: string; to: string }) {
+function normalizeTrainingLog(trainingLog?: DayData[]) {
   if (!trainingLog || trainingLog.length === 0) {
     return [];
   }
-  const sorted = [...trainingLog].sort((a, b) => a.date.localeCompare(b.date));
-
-  if (visiblePeriod) {
-    return sorted.filter(
-      (day) => day.date >= visiblePeriod.from && day.date <= visiblePeriod.to,
-    );
-  }
-
-  return sorted.slice(-14);
+  return [...trainingLog].sort((a, b) => a.date.localeCompare(b.date));
 }
 
 function missingApiKeyResponse() {
@@ -53,7 +45,7 @@ export async function POST(request: Request) {
       return missingApiKeyResponse();
     }
 
-    const trainingLog = normalizeTrainingLog(body.trainingLog, body.visiblePeriod);
+    const trainingLog = normalizeTrainingLog(body.trainingLog);
     const visiblePeriod = body.visiblePeriod;
 
     const methodicContext = buildMethodicContext({
@@ -63,7 +55,7 @@ export async function POST(request: Request) {
       includeFullLibrary: true,
     });
 
-    const ragReferences = chunksToReferences(searchKnowledge(body.message, 6));
+    const ragReferences = chunksToReferences(searchKnowledge(body.message, CHAT_RAG_TOP_K));
 
     try {
       if (stream) {
@@ -144,7 +136,7 @@ export async function POST(request: Request) {
 
       return NextResponse.json({
         replyText: llmResult.replyText,
-        references: mergedReferences.slice(0, 6),
+        references: mergedReferences.slice(0, CHAT_RAG_TOP_K),
         calendarActions: llmResult.calendarActions ?? [],
         workoutPlan: llmResult.workoutPlan ?? [],
         savedCoachNotes: llmResult.savedCoachNotes ?? [],

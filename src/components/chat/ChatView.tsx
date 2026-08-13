@@ -5,7 +5,7 @@ import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react'
 import { buildApiKeyHeaders } from '../../lib/apiKeyHeaders';
 import { planItemsToCalendarActions } from '../../lib/calendarActions';
 import { readPlainTextStream } from '../../lib/readPlainTextStream';
-import { buildVisiblePeriodContext } from '../../lib/visiblePeriod';
+import { buildChatAiContext } from '../../lib/trainingHistoryContext';
 import { CHAT_WELCOME_MESSAGE, useChatStore } from '../../store/useChatStore';
 import { useTrainingStore } from '../../store/useTrainingStore';
 import type { CalendarAction, ChatReference, WorkoutPlanItem } from '../../types/api';
@@ -313,8 +313,6 @@ export function ChatView() {
   const apiKeys = useTrainingStore((s) => s.apiKeys);
   const userMetrics = useTrainingStore((s) => s.userMetrics);
   const uploadedMethodology = useTrainingStore((s) => s.uploadedMethodology);
-  const calendarAnchorDate = useTrainingStore((s) => s.calendarAnchorDate);
-  const currentView = useTrainingStore((s) => s.currentView);
   const applyCalendarActions = useTrainingStore((s) => s.applyCalendarActions);
   const coachNotes = useTrainingStore((s) => s.coachNotes);
   const addCoachNotesFromAi = useTrainingStore((s) => s.addCoachNotesFromAi);
@@ -378,11 +376,13 @@ export function ChatView() {
       setIsLoading(true);
 
       try {
-        const { trainingLog, visiblePeriod } = buildVisiblePeriodContext(
-          days,
-          calendarAnchorDate,
-          currentView,
-        );
+        const {
+          trainingLog,
+          visiblePeriod,
+          stravaHistorySummary,
+          upcomingPlanSummary,
+          planComparisonSummary,
+        } = buildChatAiContext(days);
 
         const requestBody = {
           message: trimmed,
@@ -391,6 +391,9 @@ export function ChatView() {
           uploadedMethodology,
           visiblePeriod,
           coachNotes,
+          stravaHistorySummary,
+          upcomingPlanSummary,
+          planComparisonSummary,
         };
 
         const useStream = false;
@@ -553,7 +556,7 @@ export function ChatView() {
         setIsLoading(false);
       }
     },
-    [days, isLoading, apiKeys, userMetrics, uploadedMethodology, calendarAnchorDate, currentView, coachNotes, applyCalendarActions, addCoachNotesFromAi, handleApplyWorkoutPlan],
+    [days, isLoading, apiKeys, userMetrics, uploadedMethodology, coachNotes, applyCalendarActions, addCoachNotesFromAi, handleApplyWorkoutPlan],
   );
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -581,13 +584,13 @@ export function ChatView() {
                 {uploadedMethodology.length}{' '}
                 {uploadedMethodology.length === 1 ? 'dokument' : 'dokumenty'}
               </span>
-              {' '}+ zobrazené období kalendáře ({currentView === 'month' ? 'měsíc' : currentView === 'week' ? 'týden' : '2 týdny'})
+              {' '}+ historie Strava (30 dní) a nadcházející plán (3 týdny)
             </>
           ) : (
             <>
               Načteno:{' '}
               <span className="font-medium">více metodických zdrojů</span>
-              {' '}(Daniels, Uphill Athlete, nahrané podklady, vestavěná knihovna) + zobrazené období kalendáře
+              {' '}(Daniels, Canova, Bakken, Seiler, Uphill Athlete, nahrané podklady) + historie Strava (30 dní) a nadcházející plán
             </>
           )}
         </p>

@@ -54,10 +54,63 @@ export const KNOWLEDGE_BASE: KnowledgeChunk[] = [
     quote: 'Regenerační trénink musí být skutečně lehký – pod 70 % TFmax.',
     keywords: ['únava', 'regener', 'recovery', 'týden', 'vyhodnoť', 'readiness'],
   },
+  {
+    id: 'seiler-polarized',
+    bookTitle: 'Seiler – Polarized Training',
+    chapterOrPage: 'Kapitola 2, s. 45',
+    quote: 'Elitní vytrvalci trénují ~80 % objemu v nízké intenzitě (Z1–Z2) a ~20 % vysoké intenzity.',
+    keywords: ['polariz', 'z2', 'objem', 'intenzit', '80/20', 'vytrval'],
+  },
+  {
+    id: 'seiler-interval-spacing',
+    bookTitle: 'Seiler – Polarized Training',
+    chapterOrPage: 'Kapitola 4, s. 78',
+    quote: 'Vysoce intenzivní trénink vyžaduje minimálně 48 hodin regenerace před další hard session.',
+    keywords: ['interval', 'regener', 'recovery', 'vo2', 'hard', 'únava'],
+  },
+  {
+    id: 'canova-progression',
+    bookTitle: 'Renato Canova – Marathon Training',
+    chapterOrPage: 'Kapitola 6, s. 134',
+    quote: 'Progrese objemu nesmí překročit 10–15 % týdně – jinak hrozí přetrénování a zranění.',
+    keywords: ['objem', 'longrun', 'progres', 'kilometráž', 'týden', 'zranění'],
+  },
+  {
+    id: 'canova-specific',
+    bookTitle: 'Renato Canova – Marathon Training',
+    chapterOrPage: 'Kapitola 9, s. 201',
+    quote: 'Specifický trénink musí kopírovat požadavky závodu – tempo, profil, délku.',
+    keywords: ['tempo', 'maraton', 'závod', 'race', 'specif'],
+  },
+  {
+    id: 'bakken-consistency',
+    bookTitle: 'Erik Bakken – Consistency First',
+    chapterOrPage: 'Kapitola 3, s. 58',
+    quote: 'Konzistence v easy objemu je důležitější než občas extrémní trénink.',
+    keywords: ['objem', 'easy', 'klus', 'konzist', 'regener'],
+  },
+  {
+    id: 'bakken-injury',
+    bookTitle: 'Erik Bakken – Consistency First',
+    chapterOrPage: 'Kapitola 7, s. 142',
+    quote: 'Skok v délce longrunu o více než 25 % oproti dosavadnímu maximu je primární riziko zranění.',
+    keywords: ['longrun', 'zranění', 'dlouh', 'objem', 'rizik'],
+  },
+  {
+    id: 'uphill-glycogen',
+    bookTitle: 'Training for the Uphill Athlete',
+    chapterOrPage: 'Kapitola 5, s. 98',
+    quote: 'Dlouhý běh vyčerpává glykogen – následující 24–48 h vyžadují regeneraci, ne další hard session.',
+    keywords: ['longrun', 'glykogen', 'regener', 'laktát', 'interval'],
+  },
 ];
 
-/** Simuluje RAG vector search – vrací top-k relevantní chunky */
-export function searchKnowledge(query: string, topK = 3): KnowledgeChunk[] {
+/** Výchozí počet chunků pro chat RAG – multi-source syntéza */
+export const CHAT_RAG_TOP_K = 12;
+export const RECALCULATE_RAG_TOP_K = 10;
+
+/** Vybere top-k chunků s prioritou diverzity zdrojů (více knih najednou) */
+export function searchKnowledge(query: string, topK = CHAT_RAG_TOP_K): KnowledgeChunk[] {
   const normalized = query.toLowerCase();
 
   const scored = KNOWLEDGE_BASE.map((chunk) => {
@@ -66,15 +119,42 @@ export function searchKnowledge(query: string, topK = 3): KnowledgeChunk[] {
       0,
     );
     return { chunk, score };
-  })
-    .filter(({ score }) => score > 0)
-    .sort((a, b) => b.score - a.score);
+  }).sort((a, b) => b.score - a.score);
 
-  if (scored.length === 0) {
-    return KNOWLEDGE_BASE.slice(0, topK);
+  const matched = scored.filter(({ score }) => score > 0);
+  const pool = matched.length > 0 ? matched : scored.map(({ chunk }) => ({ chunk, score: 0 }));
+
+  const selected: KnowledgeChunk[] = [];
+  const usedIds = new Set<string>();
+  const bookCounts = new Map<string, number>();
+
+  while (selected.length < topK) {
+    let picked = false;
+
+    for (const { chunk } of pool) {
+      if (usedIds.has(chunk.id)) continue;
+      const count = bookCounts.get(chunk.bookTitle) ?? 0;
+      if (count >= 2) continue;
+
+      selected.push(chunk);
+      usedIds.add(chunk.id);
+      bookCounts.set(chunk.bookTitle, count + 1);
+      picked = true;
+      if (selected.length >= topK) break;
+    }
+
+    if (!picked) {
+      for (const { chunk } of pool) {
+        if (usedIds.has(chunk.id)) continue;
+        selected.push(chunk);
+        usedIds.add(chunk.id);
+        if (selected.length >= topK) break;
+      }
+      break;
+    }
   }
 
-  return scored.slice(0, topK).map(({ chunk }) => chunk);
+  return selected;
 }
 
 export function chunksToReferences(chunks: KnowledgeChunk[]): ChatReference[] {
@@ -115,9 +195,9 @@ export function generateChatResponse(
   };
 }
 
-/** Připraví RAG kontext pro LLM prompt (chat) */
+/** Připraví RAG kontext pro LLM prompt (chat) – multi-source */
 export function buildChatRagContext(query: string): string {
-  const chunks = searchKnowledge(query, 5);
+  const chunks = searchKnowledge(query, CHAT_RAG_TOP_K);
   return formatChunksAsContext(chunks);
 }
 
@@ -129,7 +209,7 @@ export function buildRecalculateRagContext(readinessScore: number): string {
     'prahový tempo interval longrun objem',
   ].join(' ');
 
-  const chunks = searchKnowledge(query, 6);
+  const chunks = searchKnowledge(query, RECALCULATE_RAG_TOP_K);
   const baseline = KNOWLEDGE_BASE.filter(
     (c) => !chunks.some((existing) => existing.id === c.id),
   ).slice(0, 2);

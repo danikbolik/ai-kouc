@@ -18,6 +18,20 @@ export type WorkoutCategory =
 
 const ZONE_IDS: ZoneId[] = ['Z1', 'Z2', 'Z3', 'Z4', 'Z5'];
 
+const CZECH_WEEKDAYS = [
+  'neděle',
+  'pondělí',
+  'úterý',
+  'středa',
+  'čtvrtek',
+  'pátek',
+  'sobota',
+] as const;
+
+function formatCzechWeekday(dateStr: string): string {
+  return CZECH_WEEKDAYS[parseDate(dateStr).getDay()];
+}
+
 export interface ActivityAnalyticsRecord {
   date: string;
   title: string;
@@ -322,7 +336,7 @@ export function buildTimeInZonesReport(
   }
 
   blocks.push(
-    '\nVyhodnocuj polarizaci (cíl ~80/20): vysoký podíl Z1–Z2 v objemové/zimní fázi je správně; nadprahová VO2max objem mimo specifickou fázi kritizuj.',
+    '\nPři hodnocení struktury tréninku cituj konkrétní % Z1–Z2 vs Z3–Z5 z řádků Polarizace výše. Vyhodnocuj polarizaci (cíl ~80/20): vysoký podíl Z1–Z2 v objemové/zimní fázi je správně; nadprahová VO2max objem mimo specifickou fázi kritizuj.',
   );
 
   return blocks.join('\n');
@@ -406,12 +420,12 @@ export function buildRecentStravaRunsDetail(
         .map((z) => `${z.zone} ${z.percent}%`)
         .join(', ') ?? null;
 
-    return `- **${a.date}** | ${a.title} (${CATEGORY_LABELS[a.category]})
+    return `- **${a.date} (${formatCzechWeekday(a.date)})** | ${a.title} (${CATEGORY_LABELS[a.category]})
   ${a.distanceKm} km @ ${a.avgPace}/km, ${a.durationMin} min, TF ${a.avgHR || '?'} (${hrZone})${hrDetail ? ` | zóny: ${hrDetail}` : ''}`;
   });
 
   return `## Přesný přehled odbehaných běhů ze Stravy (posledních ${lastDays} dní)
-Použij pro kontrolu včerejška, středy a dalších dnů aktuálního týdne – porovnej s plánem.
+Použij pro kontrolu včerejška, středy a dalších dnů – v odpovědi referuj český den („Ve středu jsi běžel…", „Včera jsi odtrénoval…") a porovnej s plánem.
 
 ${lines.join('\n')}`;
 }

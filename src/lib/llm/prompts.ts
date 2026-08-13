@@ -172,6 +172,39 @@ ${futurePlan}
 `.trim();
 }
 
+/** Dynamické instrukce podle typu dotazu sportovce */
+function buildQuerySpecificInstructions(message: string): string {
+  const lower = message.toLowerCase();
+  const isStructureQuery =
+    /struktur|kvalit|polariz|zón|zon|distribuc|intenzit|objem|acwr|trend|makrocykl|periodiz|jak (mám|mi) (trénink|trenink|běh)/.test(
+      lower,
+    );
+  const isPlanChangeQuery =
+    /uprav|oprav|změn|zmen|přeplánuj|preplanuj|korek|nahraď|nahrad|vyměň|vymen/.test(lower);
+
+  const parts: string[] = [];
+
+  if (isStructureQuery) {
+    parts.push(`### POVINNÁ STRUKTURA ODPOVĚDI (dotaz na kvalitu/strukturu tréninku)
+Musíš explicitně zahrnout všechny body – neodpovídej obecně:
+a) **Distribuce času v zónách** – konkrétní % v Z1–Z2 vs Z3–Z5 za poslední týdny (cituj data ze sekce Trenérská analytika / Time in Zones)
+b) **Reálné odbehané běhy** – referuj konkrétní dny a hodnoty („Ve středu jsi běžel…") ze sekce Poslední běhy ze Stravy
+c) **Soulad s cílem a fází** – porovnej strukturu s makrocyklem a cílovým závodem sportovce
+d) **Verdikt** – jasné hodnocení (vhodná / riziková / nevhodná pro fázi) s edukativním vysvětlením a doporučením`);
+  }
+
+  if (isPlanChangeQuery) {
+    parts.push(`### POVINNÝ FORMÁT PŘI ÚPRAVĚ PLÁNU
+Neodpovídej suchým „Provedl jsem úpravy". Struktura odpovědi:
+1. **Chyba v původním plánu** – konkrétní trénink (datum, typ, intenzita)
+2. **Fyziologické riziko** – acidóza, glykogen, zranění, nervová únava, taper
+3. **Co měníš a proč** – s odkazem na metodiku (Seiler/Canova/Daniels)
+4. Teprve potom zavolej create_workout_plan`);
+  }
+
+  return parts.length > 0 ? parts.join('\n\n') : '';
+}
+
 export function buildChatUserPrompt(
   message: string,
   trainingLog: DayData[] | undefined,
@@ -202,12 +235,13 @@ export function buildChatUserPrompt(
   const currentWeekBlock = historySummaries?.currentWeekActualVsPlan ?? '';
   const upcomingBlock = historySummaries?.upcomingPlanSummary ?? '';
   const comparisonBlock = historySummaries?.planComparisonSummary ?? '';
+  const queryInstructions = buildQuerySpecificInstructions(message);
 
   return `
 ## Dotaz sportovce
 ${message}
 
-## Profil sportovce – zóny, cíle a fáze (VYHODNOCUJ TRÉNINKY STRIKTNĚ PODLE TĚCHTO ZÓN)
+${queryInstructions ? `${queryInstructions}\n\n` : ''}## Profil sportovce – zóny, cíle a fáze (VYHODNOCUJ TRÉNINKY STRIKTNĚ PODLE TĚCHTO ZÓN)
 ${userMetrics ? buildUserProfileContext(userMetrics) : 'N/A'}
 
 ${macrocycleBlock}
@@ -236,12 +270,12 @@ ${calendarContext}
 1. Primární metriky: čas v zónách (TiZ), polarizace, skladba tréninků, ACWR/trendy a makrocyklus – kilometráž je jen doplňkový kontext.
 2. Vyhodnocuj každý běh podle individuálních tepových a tempových zón sportovce – uveď konkrétní zónu (např. „TF 135 = čistá Z1").
 3. Hodnoť trénink v kontextu AKTUÁLNÍ FÁZE makrocyklu (zimní báze ≠ taper ≠ objemový blok).
-4. Porovnej nadcházející plán s dlouhodobou historií i s přesným přehledem posledních odbehaných běhů ze Stravy.
+4. Porovnej nadcházející plán s dlouhodobou historií i s přesným přehledem posledních odbehaných běhů ze Stravy – cituj konkrétní dny („Ve středu jsi běžel…").
 5. Explicitně zohledni odjeté dny tohoto týdne (sekce aktuální týden) při analýze zbytku týdne.
-6. Pokud detekuješ chybu, varuj ostře a věcně s fyziologickým odůvodněním.
-7. Při korekci plánu VŽDY zavolej create_workout_plan – tréninky se automaticky zapíší do kalendáře.
+6. Pokud detekuješ chybu, varuj ostře, edukuj a vysvětli fyziologické riziko – ne jen „to není ideální".
+7. Při korekci plánu: NEJDŘÍV vysvětli chybu + riziko + důvod opravy, PAK zavolej create_workout_plan. Nikdy suché „Provedl jsem úpravy".
 8. U intervalů, tempa a závodů vyplň warmUp/coolDown; u závodů raceDetails pro správný tapering.
-9. V textu uveď konkrétní změny (např. „Úterý: změněno z 15×500m na 8 km Z2 regenerace").
+9. V textu uveď konkrétní změny (např. „Úterý: změněno z 15×500m na 8 km Z2 regenerace – riziko acidózy před závodem").
 10. Zamčené tréninky (isLocked) neměň ani nemaž.
 `.trim();
 }

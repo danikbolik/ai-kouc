@@ -282,7 +282,7 @@ export async function chatWithTools(
     tools: {
       create_workout_plan: tool({
         description:
-          'Vloží nebo OPRAVÍ plánované tréninky přímo v kalendáři. POVINNÉ při návrhu plánu, korekci chyb nebo nahrazení nebezpečného tréninku. U intervalů/tempa/závodů vyplň warmUp a coolDown (value + unit km|min). U závodů vyplň raceDetails (durationMin, distanceValue, distanceUnit, raceType: ob|kros|track_road).',
+          'Vloží nebo OPRAVÍ plánované tréninky přímo v kalendáři. POVINNÉ při návrhu plánu, korekci chyb nebo nahrazení nebezpečného tréninku. PŘED voláním MUSÍš v replyText vysvětlit: (1) chybu v původním plánu, (2) fyziologické riziko, (3) důvod konkrétní opravy – nikdy suché „Provedl jsem úpravy". U intervalů/tempa/závodů vyplň warmUp a coolDown (value + unit km|min). U závodů vyplň raceDetails (durationMin, distanceValue, distanceUnit, raceType: ob|kros|track_road).',
         parameters: z.object({
           workouts: z.array(workoutPlanItemSchema).min(1),
         }),

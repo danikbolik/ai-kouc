@@ -6,6 +6,22 @@ export const RACE_TYPE_OPTIONS: { value: RaceType; label: string }[] = [
   { value: 'track_road', label: 'Dráha / Silnice' },
 ];
 
+export function getWarmCoolDistanceKm(segment?: WarmCoolSegment): number {
+  if (!segment?.value || segment.value <= 0) return 0;
+  if (segment.unit === 'km') return segment.value;
+  return 0;
+}
+
+/** Celková plánovaná vzdálenost = hlavní část + rozklus + výklus (jen km jednotky) */
+export function getPlannedWorkoutTotalDistanceKm(
+  workout: Pick<PlannedWorkout, 'distanceKm' | 'warmUp' | 'coolDown'>,
+): number {
+  const main = workout.distanceKm ?? 0;
+  const warmup = getWarmCoolDistanceKm(workout.warmUp);
+  const cooldown = getWarmCoolDistanceKm(workout.coolDown);
+  return Math.round((main + warmup + cooldown) * 10) / 10;
+}
+
 export function needsWarmUpCoolDown(type: ActivityType): boolean {
   return type === 'intervals' || type === 'tempo' || type === 'race';
 }

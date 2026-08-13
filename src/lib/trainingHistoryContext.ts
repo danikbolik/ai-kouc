@@ -1,6 +1,6 @@
 import { addDaysToDate, formatDateKey, getTodayDate, parseDate } from './dates';
 import { getActivities, normalizeDayData } from './dayData';
-import { formatWorkoutExtrasForAi } from './workoutExtras';
+import { formatWorkoutExtrasForAi, getPlannedWorkoutTotalDistanceKm } from './workoutExtras';
 import {
   formatStravaActualDetailsForAi,
   summarizeStravaActualForAi,
@@ -191,10 +191,11 @@ export function buildUpcomingPlanSummary(
     if (!day?.plannedWorkouts.length) continue;
 
     for (const w of day.plannedWorkouts) {
-      const kmPart = w.distanceKm !== undefined ? `${w.distanceKm} km` : '';
+      const totalKm = getPlannedWorkoutTotalDistanceKm(w);
+      const kmPart = totalKm > 0 ? `${totalKm} km` : w.distanceKm !== undefined ? `${w.distanceKm} km` : '';
       const pacePart = w.targetPace ? `@ ${w.targetPace}` : '';
       const hrPart = w.targetHR ? `TF ${w.targetHR}` : '';
-      totalPlannedKm += w.distanceKm ?? 0;
+      totalPlannedKm += totalKm;
       lines.push(
         `- ${date} [${w.phase}] ${w.title} (${w.type}) | ${[kmPart, pacePart, hrPart].filter(Boolean).join(' ')}${w.isLocked ? ' 🔒' : ''}${formatWorkoutExtrasForAi(w)}`,
       );
@@ -238,7 +239,7 @@ export function buildPlanVsHistoryComparison(
     if (!day) continue;
 
     for (const w of day.plannedWorkouts) {
-      const km = w.distanceKm ?? 0;
+      const km = getPlannedWorkoutTotalDistanceKm(w);
       if (km > maxPlannedSingle) {
         maxPlannedSingle = km;
         maxPlannedDate = date;

@@ -1,7 +1,7 @@
 import { getWeekdayShort } from './dates';
 import { getActivities, getPlannedWorkouts, normalizeDayData } from './dayData';
+import { getPlannedWorkoutTotalDistanceKm } from './workoutExtras';
 import type { Activity, DayData, PlannedWorkout } from '../types/training';
-
 export interface DayKmBreakdown {
   date: string;
   weekdayShort: string;
@@ -59,14 +59,14 @@ function analyzeDay(date: string, dayData?: DayData): DayKmBreakdown {
 
   const plannedKm = plannedWorkouts
     .filter((w) => !isRestPlanned(w))
-    .reduce((sum, w) => sum + (w.distanceKm ?? 0), 0);
-  const actualKm = activities.reduce((sum, a) => sum + a.distanceKm, 0);
+    .reduce((sum, w) => sum + getPlannedWorkoutTotalDistanceKm(w), 0);  const actualKm = activities.reduce((sum, a) => sum + a.distanceKm, 0);
   const durationMin =
     activities.reduce((sum, a) => sum + activityDurationMin(a), 0) ||
     plannedWorkouts.reduce((sum, w) => sum + plannedDurationMin(w), 0);
 
-  const hasPlanned = plannedWorkouts.some((w) => !isRestPlanned(w) && (w.distanceKm ?? 0) > 0);
-  const hasActual = activities.length > 0;
+  const hasPlanned = plannedWorkouts.some(
+    (w) => !isRestPlanned(w) && getPlannedWorkoutTotalDistanceKm(w) > 0,
+  );  const hasActual = activities.length > 0;
   const allRest =
     plannedWorkouts.length > 0 && plannedWorkouts.every(isRestPlanned) && !hasActual;
 

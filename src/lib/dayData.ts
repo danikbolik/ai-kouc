@@ -6,6 +6,7 @@ import type {
   StravaLapSummary,
   WorkoutSession,
 } from '../types/training';
+import { getPlannedWorkoutTotalDistanceKm } from './workoutExtras';
 
 export function emptyDay(date: string): DayData {
   return { date, activities: [], plannedWorkouts: [] };
@@ -137,7 +138,7 @@ export function dayToLegacySessions(day: DayData): WorkoutSession[] {
       isLocked: planned.isLocked,
       planned: {
         description: planned.description,
-        distanceKm: planned.distanceKm,
+        distanceKm: getPlannedWorkoutTotalDistanceKm(planned),
         targetPace: planned.targetPace,
         targetHR: planned.targetHR,
         bookReference: planned.bookReference,

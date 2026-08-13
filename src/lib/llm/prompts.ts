@@ -1,5 +1,5 @@
 import { buildIntervalDescription } from '@/lib/intervalBuilder';
-import { formatWorkoutExtrasForAi } from '@/lib/workoutExtras';
+import { formatWorkoutExtrasForAi, getPlannedWorkoutTotalDistanceKm } from '@/lib/workoutExtras';
 import { dayToLegacySessions, normalizeDayData } from '@/lib/dayData';
 import {
   formatStravaActualDetailsForAi,
@@ -39,7 +39,9 @@ export function buildFullCalendarContext(days: DayData[]): string {
 
 function formatPlannedWorkoutLine(workout: PlannedWorkout): string {
   const planParts: string[] = [];
-  if (workout.distanceKm !== undefined) planParts.push(`${workout.distanceKm} km`);
+  const totalKm = getPlannedWorkoutTotalDistanceKm(workout);
+  if (totalKm > 0) planParts.push(`${totalKm} km celkem`);
+  else if (workout.distanceKm !== undefined) planParts.push(`${workout.distanceKm} km`);
   if (workout.targetPace) planParts.push(`@${workout.targetPace}`);
   if (workout.targetHR) planParts.push(`TF ${workout.targetHR}`);
 
@@ -151,7 +153,7 @@ export function buildRecalculateUserPrompt(
     const normalized = normalizeDayData(day);
     const fromActivities = normalized.activities.reduce((s, a) => s + a.distanceKm, 0);
     const fromPlanned = normalized.plannedWorkouts.reduce(
-      (s, w) => s + (w.distanceKm ?? 0),
+      (s, w) => s + getPlannedWorkoutTotalDistanceKm(w),
       0,
     );
     return sum + fromActivities + fromPlanned;

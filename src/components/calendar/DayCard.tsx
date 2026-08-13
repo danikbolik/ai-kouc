@@ -1,6 +1,7 @@
 'use client';
 
 import { getActivities, getPlannedWorkouts, normalizeDayData } from '../../lib/dayData';
+import { getPlannedWorkoutTotalDistanceKm } from '../../lib/workoutExtras';
 import { getTodayDate, getDayNumber, getWeekdayShort, isSameMonth } from '../../lib/dates';
 import { useTrainingStore } from '../../store/useTrainingStore';
 import type { DayData, PlannedWorkout, WorkoutSession } from '../../types/training';
@@ -24,7 +25,7 @@ function plannedToSession(workout: PlannedWorkout, activities: ReturnType<typeof
     isLocked: workout.isLocked,
     planned: {
       description: workout.description,
-      distanceKm: workout.distanceKm,
+      distanceKm: getPlannedWorkoutTotalDistanceKm(workout),
       targetPace: workout.targetPace,
       targetHR: workout.targetHR,
       bookReference: workout.bookReference,

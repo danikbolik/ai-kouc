@@ -181,6 +181,8 @@ export function buildChatUserPrompt(
   historySummaries?: {
     stravaHistorySummary: string;
     longTermHistorySummary: string;
+    macrocyclePhaseSummary: string;
+    recentRunsDetail: string;
     currentWeekActualVsPlan: string;
     upcomingPlanSummary: string;
     planComparisonSummary: string;
@@ -193,8 +195,10 @@ export function buildChatUserPrompt(
     ? `Období kontextu: ${visiblePeriod.from} až ${visiblePeriod.to} (historie + budoucí plán)`
     : 'Období kalendáře: posledních 30 dní + nadcházející 3 týdny';
 
-  const stravaBlock = historySummaries?.stravaHistorySummary ?? '';
+  const macrocycleBlock = historySummaries?.macrocyclePhaseSummary ?? '';
   const longTermBlock = historySummaries?.longTermHistorySummary ?? '';
+  const recentRunsBlock = historySummaries?.recentRunsDetail ?? '';
+  const stravaBlock = historySummaries?.stravaHistorySummary ?? '';
   const currentWeekBlock = historySummaries?.currentWeekActualVsPlan ?? '';
   const upcomingBlock = historySummaries?.upcomingPlanSummary ?? '';
   const comparisonBlock = historySummaries?.planComparisonSummary ?? '';
@@ -206,7 +210,11 @@ ${message}
 ## Profil sportovce – zóny, cíle a fáze (VYHODNOCUJ TRÉNINKY STRIKTNĚ PODLE TĚCHTO ZÓN)
 ${userMetrics ? buildUserProfileContext(userMetrics) : 'N/A'}
 
+${macrocycleBlock}
+
 ${longTermBlock}
+
+${recentRunsBlock}
 
 ${stravaBlock}
 
@@ -225,14 +233,16 @@ ${periodLine}
 ${calendarContext}
 
 ## Instrukce pro analýzu
-1. Vyhodnocuj každý běh podle individuálních tepových a tempových zón sportovce – uveď konkrétní zónu (např. „TF 135 = čistá Z1").
-2. Porovnej nadcházející plán s dlouhodobou historií (6–12 měsíců) i s aktuálním týdnem ze Stravy.
-3. Explicitně zohledni odjeté dny tohoto týdne (sekce aktuální týden) při analýze zbytku týdne.
-4. Pokud detekuješ chybu, varuj ostře a věcně s fyziologickým odůvodněním.
-5. Při korekci plánu VŽDY zavolej create_workout_plan – tréninky se automaticky zapíší do kalendáře.
-6. U intervalů, tempa a závodů vyplň warmUp/coolDown; u závodů raceDetails pro správný tapering.
-7. V textu uveď konkrétní změny (např. „Úterý: změněno z 15×500m na 8 km Z2 regenerace").
-8. Zamčené tréninky (isLocked) neměň ani nemaž.
+1. Primární metriky: čas v zónách (TiZ), polarizace, skladba tréninků, ACWR/trendy a makrocyklus – kilometráž je jen doplňkový kontext.
+2. Vyhodnocuj každý běh podle individuálních tepových a tempových zón sportovce – uveď konkrétní zónu (např. „TF 135 = čistá Z1").
+3. Hodnoť trénink v kontextu AKTUÁLNÍ FÁZE makrocyklu (zimní báze ≠ taper ≠ objemový blok).
+4. Porovnej nadcházející plán s dlouhodobou historií i s přesným přehledem posledních odbehaných běhů ze Stravy.
+5. Explicitně zohledni odjeté dny tohoto týdne (sekce aktuální týden) při analýze zbytku týdne.
+6. Pokud detekuješ chybu, varuj ostře a věcně s fyziologickým odůvodněním.
+7. Při korekci plánu VŽDY zavolej create_workout_plan – tréninky se automaticky zapíší do kalendáře.
+8. U intervalů, tempa a závodů vyplň warmUp/coolDown; u závodů raceDetails pro správný tapering.
+9. V textu uveď konkrétní změny (např. „Úterý: změněno z 15×500m na 8 km Z2 regenerace").
+10. Zamčené tréninky (isLocked) neměň ani nemaž.
 `.trim();
 }
 

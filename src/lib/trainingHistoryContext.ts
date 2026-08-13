@@ -5,7 +5,13 @@ import {
   formatStravaActualDetailsForAi,
   summarizeStravaActualForAi,
 } from './stravaAnalysis';
+import {
+  buildCoachingAnalyticsSummary,
+  buildRecentStravaRunsDetail,
+} from './coachingAnalytics';
+import { buildMacrocyclePhaseContext } from './athleteProfileContext';
 import type { DayData } from '../types/training';
+import type { UserMetrics } from '../types/settings';
 
 export const CHAT_HISTORY_DAYS = 30;
 export const CHAT_FUTURE_DAYS = 21;
@@ -134,18 +140,26 @@ function formatMonthLabel(monthKey: string): string {
   return `${monthNames[idx] ?? month} ${year}`;
 }
 
-/** Souhrnné statistiky za 6–12 měsíců pro long-term kontext AI */
+/** Souhrnné statistiky za rok + trenérská analytika (zóny, trendy) */
 export function buildLongTermHistorySummary(
   days: Record<string, DayData>,
+  userMetrics?: UserMetrics,
   lookbackDays = LONG_TERM_HISTORY_DAYS,
 ): string {
   const today = getTodayDate();
   const fromDate = formatDateKey(addDaysToDate(parseDate(today), -(lookbackDays - 1)));
   const runs = collectAllRunsFromDays(days, fromDate, today);
 
+  const coachingBlock =
+    userMetrics != null
+      ? buildCoachingAnalyticsSummary(days, userMetrics)
+      : '## Trenérská analytika\nChybí profil sportovce (zóny) – vyhodnocuj pouze z dostupných Strava dat.';
+
   if (runs.length === 0) {
-    return `## Dlouhodobá historie ze Stravy (posledních ${lookbackDays} dní)
-Žádná synchronizovaná data – long-term kontext chybí. Upozorni sportovce.`;
+    return `${coachingBlock}
+
+## Dlouhodobý objem (posledních ${lookbackDays} dní)
+Žádná synchronizovaná Strava data v tomto období.`;
   }
 
   const totalKm = runs.reduce((s, r) => s + r.distanceKm, 0);
@@ -155,49 +169,21 @@ export function buildLongTermHistorySummary(
   for (const run of runs) {
     const monthKey = run.date.slice(0, 7);
     monthlyKm.set(monthKey, (monthlyKm.get(monthKey) ?? 0) + run.distanceKm);
-
     const weekStart = getWeekDays(parseDate(run.date))[0];
     weeklyKm.set(weekStart, (weeklyKm.get(weekStart) ?? 0) + run.distanceKm);
   }
 
   const maxWeeklyEntry = [...weeklyKm.entries()].sort((a, b) => b[1] - a[1])[0];
   const maxMonthlyEntry = [...monthlyKm.entries()].sort((a, b) => b[1] - a[1])[0];
-  const avgWeeklyKm = totalKm / Math.max(1, lookbackDays / 7);
-  const weeksWithData = weeklyKm.size;
-  const avgWeeklyWhenTraining =
-    weeksWithData > 0
-      ? [...weeklyKm.values()].reduce((s, km) => s + km, 0) / weeksWithData
-      : 0;
+  const topLongRuns = [...runs].sort((a, b) => b.distanceKm - a.distanceKm).slice(0, 3);
 
-  const topLongRuns = [...runs].sort((a, b) => b.distanceKm - a.distanceKm).slice(0, 5);
-  const recentMonths = [...monthlyKm.entries()]
-    .sort((a, b) => a[0].localeCompare(b[0]))
-    .slice(-12);
+  const volumeBlock = `## Dlouhodobý objem (doplňkový kontext, ne primární metrika)
+- Celkový objem ${lookbackDays} dní: ${totalKm.toFixed(1)} km (${runs.length} běhů)
+- Max. týden: ${maxWeeklyEntry[1].toFixed(1)} km (od ${maxWeeklyEntry[0]})
+- Max. měsíc: ${maxMonthlyEntry[1].toFixed(1)} km (${formatMonthLabel(maxMonthlyEntry[0])})
+- Top longruny: ${topLongRuns.map((r) => `${r.distanceKm} km (${r.date})`).join(', ')}`;
 
-  const monthLines = recentMonths
-    .map(([key, km]) => `- ${formatMonthLabel(key)}: ${km.toFixed(1)} km`)
-    .join('\n');
-
-  const longRunLines = topLongRuns
-    .map((r) => `- ${r.distanceKm} km (${r.date}, ${r.title})`)
-    .join('\n');
-
-  return `## Dlouhodobá historie ze Stravy (posledních ${lookbackDays} dní / ~${Math.round(lookbackDays / 30)} měsíců)
-
-### Roční/měsíční souhrn
-- Celkový objem: ${totalKm.toFixed(1)} km (${runs.length} běhů)
-- Průměrný týdenní objem: ${avgWeeklyKm.toFixed(1)} km/týden
-- Průměr v týdnech s během: ${avgWeeklyWhenTraining.toFixed(1)} km/týden (${weeksWithData} týdnů)
-- **Max. týdenní objem:** ${maxWeeklyEntry[1].toFixed(1)} km (týden od ${maxWeeklyEntry[0]})
-- **Max. měsíční objem:** ${maxMonthlyEntry[1].toFixed(1)} km (${formatMonthLabel(maxMonthlyEntry[0])})
-
-### Měsíční kilometráž (posledních ${recentMonths.length} měsíců)
-${monthLines}
-
-### Top 5 nejdelších běhů v období
-${longRunLines}
-
-Při hodnocení plánovaného objemu porovnávej s těmito long-term maximy – 120 km/týden může být OK, pokud sportovec v objemové fázi opakovaně běhal podobné objemy.`;
+  return `${coachingBlock}\n\n${volumeBlock}`;
 }
 
 /** Aktuální týden (Po–Ne): reálné Strava běhy vs. plán */
@@ -437,16 +423,25 @@ export function buildPlanVsHistoryComparison(
 ${flags.length > 0 ? `\n### Detekovaná rizika\n${flags.join('\n')}` : '\nŽádná automatická rizika nebyla detekována – stále kriticky zkontroluj rozložení intenzit.'}`;
 }
 
-export function buildAiContextSummaries(days: Record<string, DayData>): {
+export function buildAiContextSummaries(
+  days: Record<string, DayData>,
+  userMetrics?: UserMetrics,
+): {
   stravaHistorySummary: string;
   longTermHistorySummary: string;
+  macrocyclePhaseSummary: string;
+  recentRunsDetail: string;
   currentWeekActualVsPlan: string;
   upcomingPlanSummary: string;
   planComparisonSummary: string;
 } {
   return {
     stravaHistorySummary: buildStravaHistorySummary(days),
-    longTermHistorySummary: buildLongTermHistorySummary(days),
+    longTermHistorySummary: buildLongTermHistorySummary(days, userMetrics),
+    macrocyclePhaseSummary: userMetrics
+      ? buildMacrocyclePhaseContext(userMetrics)
+      : 'Makrocyklus: chybí profil sportovce.',
+    recentRunsDetail: buildRecentStravaRunsDetail(days, 14, userMetrics),
     currentWeekActualVsPlan: buildCurrentWeekActualVsPlan(days),
     upcomingPlanSummary: buildUpcomingPlanSummary(days),
     planComparisonSummary: buildPlanVsHistoryComparison(days),
@@ -474,11 +469,14 @@ export function buildChatAiContext(
   days: Record<string, DayData>,
   historyDays = CHAT_HISTORY_DAYS,
   futureDays = CHAT_FUTURE_DAYS,
+  userMetrics?: UserMetrics,
 ): {
   trainingLog: DayData[];
   visiblePeriod: { from: string; to: string };
   stravaHistorySummary: string;
   longTermHistorySummary: string;
+  macrocyclePhaseSummary: string;
+  recentRunsDetail: string;
   currentWeekActualVsPlan: string;
   upcomingPlanSummary: string;
   planComparisonSummary: string;
@@ -487,7 +485,7 @@ export function buildChatAiContext(
   const today = getTodayDate();
   const historyStart = formatDateKey(addDaysToDate(parseDate(today), -(historyDays - 1)));
   const futureEnd = formatDateKey(addDaysToDate(parseDate(today), futureDays));
-  const summaries = buildAiContextSummaries(days);
+  const summaries = buildAiContextSummaries(days, userMetrics);
 
   return {
     trainingLog,

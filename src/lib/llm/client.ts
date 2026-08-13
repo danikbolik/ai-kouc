@@ -242,7 +242,9 @@ export function streamChatWithLlm(
       userMetrics,
       methodicContext,
       visiblePeriod,
-      Object.keys(daysRecord).length ? buildAiContextSummaries(daysRecord) : undefined,
+      Object.keys(daysRecord).length
+        ? buildAiContextSummaries(daysRecord, userMetrics)
+        : undefined,
     ),
     temperature: 0.2,
   });
@@ -263,7 +265,7 @@ export async function chatWithTools(
     allTrainingDays ??
     Object.fromEntries((trainingLog ?? []).map((day) => [day.date, day]));
   const historySummaries = Object.keys(daysRecord).length
-    ? buildAiContextSummaries(daysRecord)
+    ? buildAiContextSummaries(daysRecord, userMetrics)
     : undefined;
 
   const result = await generateText({
@@ -360,7 +362,9 @@ Pokud sportovec žádá úpravu plánu, vyplň calendarActions. Jinak vrať prá
       userMetrics,
       methodicContext,
       visiblePeriod,
-      Object.keys(daysRecord).length ? buildAiContextSummaries(daysRecord) : undefined,
+      Object.keys(daysRecord).length
+        ? buildAiContextSummaries(daysRecord, userMetrics)
+        : undefined,
     ),
     temperature: 0.2,
   });

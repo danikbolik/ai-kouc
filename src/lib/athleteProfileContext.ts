@@ -1,4 +1,4 @@
-import { getDaysUntilDate, getTodayDate, getTrainingPhaseLabel } from './dates';
+import { getDaysUntilDate, getTodayDate, getTrainingPhaseLabel, parseDate } from './dates';
 import type { UserMetrics } from '../types/settings';
 import { formatPaceZoneForDisplay } from '../types/settings';
 
@@ -68,4 +68,75 @@ export function buildEnhancedAthleteProfile(userMetrics: UserMetrics): string {
   ]
     .filter((line) => line !== null && line !== '')
     .join('\n');
+}
+
+const MACRO_PHASE_GUIDANCE: Record<string, { macro: string; focus: string; warn: string }> = {
+  'Zimní báze': {
+    macro: 'Všeobecná příprava / Zima – Budování základu',
+    focus: 'Vysoký podíl Z1–Z2 (80 %+), longruny, kopce/síla, technika. Prahové objemy nízko.',
+    warn: 'Kritizuj přemíru VO2max intervalů a závodní intenzity mimo testy.',
+  },
+  'Přípravný blok': {
+    macro: 'Pozdní general / přechod k specifické přípravě',
+    focus: 'Postupné zavádění tempa a delších prahových úseků, udržet aerobní objem.',
+    warn: 'Varuj před skokem intenzity bez dostatečné Z2 báze.',
+  },
+  'Objemový blok': {
+    macro: 'Specifická příprava – Objemová fáze',
+    focus: 'Vysoký km objem v Z2, 1 kvalitní prahový trénink/týden, longrun progres.',
+    warn: 'Kritizuj 3+ hard days za sebou nebo longrun + intervaly back-to-back.',
+  },
+  'Prahový blok': {
+    macro: 'Specifická příprava – Prahová/intenzivní fáze',
+    focus: 'Prahové běhy, race-specific tempo, udržet 75–80 % objemu v Z1–Z2.',
+    warn: 'Varuj pokud polarizace klesne pod 70 % easy.',
+  },
+  'Závodní taper': {
+    macro: 'Tapering / Vyladění',
+    focus: 'Snížení objemu 40–60 %, krátká ostření, maximum regenerace.',
+    warn: 'Kritizuj jakýkoli objemový nebo intervalový skok v taperu.',
+  },
+  Regenerace: {
+    macro: 'Regenerační / přechodné období',
+    focus: 'Lehký objem Z1–Z2, bez strukturované intenzity.',
+    warn: 'Varuj před předčasným návratem k hard tréninku.',
+  },
+};
+
+export function buildMacrocyclePhaseContext(userMetrics: UserMetrics): string {
+  const today = getTodayDate();
+  const phaseLabel = getTrainingPhaseLabel(today);
+  const guidance = MACRO_PHASE_GUIDANCE[phaseLabel] ?? {
+    macro: phaseLabel,
+    focus: 'Vyhodnoť trénink v kontextu aktuální fáze periodizace.',
+    warn: 'Kontroluj skoky intenzity a objemu.',
+  };
+
+  const month = parseDate(today).getMonth();
+  const seasonNote =
+    month >= 10 || month <= 2
+      ? 'Aktuálně zimní období – prioritou je aerobní báze, síla a kopce, ne závodní forma.'
+      : month >= 5 && month <= 8
+        ? 'Letní sezóna – vyšší podíl specifické intenzity a závodů je očekávaný.'
+        : 'Mimo zimní sezónu – postupný přechod mezi objemem a specifickou intenzitou.';
+
+  const daysToRace =
+    userMetrics.raceDate && userMetrics.raceDate >= today
+      ? getDaysUntilDate(today, userMetrics.raceDate)
+      : null;
+
+  return `## Makrocyklus a fáze přípravy
+
+- **Aktuální blok:** ${phaseLabel}
+- **Makro-fáze:** ${guidance.macro}
+- **Sezónní kontext:** ${seasonNote}
+${daysToRace !== null ? `- **Do cílového závodu (${userMetrics.targetRace}):** ${daysToRace} dní` : ''}
+
+### Co v této fázi vyžadovat
+${guidance.focus}
+
+### Co v této fázi kritizovat
+${guidance.warn}
+
+PŘÍKAZ: Hodnoť každý trénink a plán POUZE v kontextu této fáze – ne aplikuj pravidla taperu v zimní bázi ani objemové longruny v taperu.`;
 }

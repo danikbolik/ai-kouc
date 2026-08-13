@@ -376,7 +376,7 @@ export function ChatView() {
       setIsLoading(true);
 
       try {
-        const { trainingLog, visiblePeriod } = buildChatAiContext(days);
+        const { trainingLog, visiblePeriod } = buildChatAiContext(days, undefined, undefined, userMetrics);
 
         const requestBody = {
           message: trimmed,

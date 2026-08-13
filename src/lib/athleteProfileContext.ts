@@ -1,39 +1,49 @@
 import { getDaysUntilDate, getTodayDate, getTrainingPhaseLabel, parseDate } from './dates';
 import type { UserMetrics } from '../types/settings';
-import { formatPaceZoneForDisplay } from '../types/settings';
+import {
+  classifyBpmToHrZone,
+  formatBpmWithHrZone,
+  formatHrZoneForDisplay,
+  formatPaceZoneForDisplay,
+  getEffectiveHrZones,
+} from '../types/settings';
 
-/** Odvozené tepové zóny Z1–Z5 z profilu sportovce */
+/** Tepové zóny z profilu sportovce – striktní BPM rozsahy pro AI */
 export function buildHrZonesContext(userMetrics: UserMetrics): string {
-  const max = userMetrics.HRmax;
-  const aet = userMetrics.AeT ?? Math.round(max * 0.75);
-  const anp = userMetrics.ANP;
-  const z1Max = Math.round(max * 0.65);
-  const z4Max = Math.round(max * 0.95);
+  const zones = getEffectiveHrZones(userMetrics);
+  const zoneLines = zones.map(
+    (zone) =>
+      `  ${zone.zone} (${zone.description}): TF ${formatHrZoneForDisplay(zone)} bpm`,
+  );
+
+  const z12 = zones.filter((z) => z.zone === 'Z1' || z.zone === 'Z2');
+  const z12Range = z12
+    .flatMap((z) => [z.minBpm, z.maxBpm])
+    .filter((v): v is number => v !== undefined);
+  const z12Min = z12Range.length > 0 ? Math.min(...z12Range) : '?';
+  const z12Max = z12Range.length > 0 ? Math.max(...z12Range) : '?';
+
+  const example165 = formatBpmWithHrZone(165, userMetrics);
+  const example142 = formatBpmWithHrZone(142, userMetrics);
 
   return [
-    'Tepové zóny (VYHODNOCUJ KAŽDÝ BĚH STRIKTNĚ PODLE TĚCHTO HRANIC – ne obecných tabulek):',
-    `  Z1 regenerace/easy: TF ≤ ${z1Max} bpm`,
-    `  Z2 aerobní objem: ${z1Max + 1}–${aet} bpm`,
-    `  Z3 střední/intenzita: ${aet + 1}–${anp} bpm`,
-    `  Z4 prahová/závodní: ${anp + 1}–${z4Max} bpm`,
-    `  Z5 VO2max/sprint: > ${z4Max} bpm`,
-    `  Referenční prahy: AeT ${aet} bpm | ANP/LT ${anp} bpm | TFmax ${max} bpm`,
+    'Tepové zóny (BPM) – STRIKTNÍ PRAVIDLA, NIKDY nezaměňuj zóny:',
+    ...zoneLines,
+    '',
+    `  Z1–Z2 dohromady = pouze TF ${z12Min}–${z12Max} bpm (ne širší rozsah!)`,
+    `  Referenční prahy: AeT ${userMetrics.AeT ?? '—'} bpm | ANP/LT ${userMetrics.ANP} bpm | TFmax ${userMetrics.HRmax} bpm`,
+    '',
+    'PŘÍKAZ PRO AI – VALIDACE TF:',
+    '- NIKDY nepiš „Z1–Z2" pro TF mimo rozsahy Z1 a Z2 výše',
+    `- Příklad: ${example142} – použij přesně tuto klasifikaci`,
+    `- Příklad: ${example165} – NIKDY neoznačuj jako Z1–Z2`,
+    '- Při návrhu targetHR v plánu MUSÍ hodnota spadat do deklarované zóny',
+    '- Tempové zóny (min/km) a tepové zóny (BPM) jsou RŮZNÉ systémy – nepleť je',
   ].join('\n');
 }
 
 export function classifyHeartRateZone(hr: number, userMetrics: UserMetrics): string {
-  if (hr <= 0) return 'neznámá';
-  const max = userMetrics.HRmax;
-  const aet = userMetrics.AeT ?? Math.round(max * 0.75);
-  const anp = userMetrics.ANP;
-  const z1Max = Math.round(max * 0.65);
-  const z4Max = Math.round(max * 0.95);
-
-  if (hr <= z1Max) return 'Z1';
-  if (hr <= aet) return 'Z2';
-  if (hr <= anp) return 'Z3';
-  if (hr <= z4Max) return 'Z4';
-  return 'Z5';
+  return classifyBpmToHrZone(hr, userMetrics);
 }
 
 export function buildEnhancedAthleteProfile(userMetrics: UserMetrics): string {
@@ -54,7 +64,7 @@ export function buildEnhancedAthleteProfile(userMetrics: UserMetrics): string {
     `Anaerobní práh (ANP/LT): ${userMetrics.ANP} bpm`,
     buildHrZonesContext(userMetrics),
     paceZoneLines.length > 0
-      ? `Tempové zóny (min/km):\n${paceZoneLines.join('\n')}`
+      ? `Tempové zóny (min/km) – oddělené od tepových:\n${paceZoneLines.join('\n')}`
       : null,
     '',
     '## Cíle a periodizace',
@@ -139,4 +149,15 @@ ${guidance.focus}
 ${guidance.warn}
 
 PŘÍKAZ: Hodnoť každý trénink a plán POUZE v kontextu této fáze – ne aplikuj pravidla taperu v zimní bázi ani objemové longruny v taperu.`;
+}
+
+export function buildMultiStageRaceWeekendRules(): string {
+  return `## Víkendové etapové / vícekolové závody (POVINNÉ)
+
+- Pokud sportovec hlásí N× stejně dlouhý závod o víkendu (např. 4 etapy OB), pracuj s PŘESNÝM počtem etap STEJNÉHO typu a formátu
+- NEHALUCINUJ různé formáty (sprint vs dlouhá trať) – všechny etapy musí být konzistentní, pokud to sportovec neřekne jinak
+- Každou etapu plánuj samostatně v update_calendar_workouts se stejným raceDetails (typ, délka, TF)
+- Distribuuj síly: první etapy plná intenzita dle plánu, poslední etapy úsporněji (nižší TF, kratší rozcvička)
+- Mezi etapami vyžaduj regeneraci (Z1), dostatek spánku a glykogen – kritizuj back-to-back maximální intenzitu bez odpočinku
+- V odpovědi uveď přehled všech etap víkendu den po dni s TF v souladu s tepovými zónami sportovce`;
 }

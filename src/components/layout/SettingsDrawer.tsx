@@ -9,7 +9,9 @@ import {
 } from '../../lib/readMethodologyFile';
 import { getOrCreateUserId } from '../../lib/userId';
 import {
+  DEFAULT_HR_ZONES,
   DEFAULT_PACE_ZONES,
+  type HrZone,
   type PaceZone,
 } from '../../types/settings';
 import { CoachNotesPanel } from '../settings/CoachNotesPanel';
@@ -63,6 +65,9 @@ export function SettingsDrawer() {
   const [paceZones, setPaceZones] = useState<PaceZone[]>(
     storedUserMetrics.paceZones ?? DEFAULT_PACE_ZONES,
   );
+  const [hrZones, setHrZones] = useState<HrZone[]>(
+    storedUserMetrics.hrZones ?? DEFAULT_HR_ZONES,
+  );
 
   const [openaiApiKey, setOpenaiApiKey] = useState('');
   const [showOpenAiKey, setShowOpenAiKey] = useState(false);
@@ -83,6 +88,7 @@ export function SettingsDrawer() {
     setRaceDate(storedUserMetrics.raceDate ?? '2026-09-06');
     setRaceDistance(String(storedUserMetrics.raceDistanceKm ?? 21.1));
     setPaceZones(storedUserMetrics.paceZones ?? DEFAULT_PACE_ZONES);
+    setHrZones(storedUserMetrics.hrZones ?? DEFAULT_HR_ZONES);
     setMetricsSaveFeedback(null);
     setUploadError(null);
     setSaveFeedback(null);
@@ -121,6 +127,7 @@ export function SettingsDrawer() {
       raceDate: raceDate || undefined,
       raceDistanceKm: Number(raceDistance) || 21.1,
       paceZones,
+      hrZones,
     });
     setMetricsSaveFeedback('Parametry uloženy do prohlížeče.');
     setTimeout(() => setMetricsSaveFeedback(null), 3000);
@@ -334,6 +341,75 @@ export function SettingsDrawer() {
                           const next = [...paceZones];
                           next[index] = { ...zone, label: e.target.value };
                           setPaceZones(next);
+                        }}
+                        className="rounded-lg border border-slate-200 px-2 py-1.5 text-xs"
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <h3 className="mb-3 text-sm font-semibold text-slate-900">
+                  Tepové zóny (BPM)
+                </h3>
+                <p className="mb-3 text-xs text-slate-500">
+                  AI vyhodnocuje každý běh striktně podle těchto tepových rozsahů – nesmí zaměňovat
+                  zóny (např. TF 165 ≠ Z1–Z2).
+                </p>
+                <div className="mb-2 grid grid-cols-[2.5rem_1fr_4rem_4rem_1fr] gap-2 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                  <span>Zóna</span>
+                  <span>Typ</span>
+                  <span>Min</span>
+                  <span>Max</span>
+                  <span>Rozsah</span>
+                </div>
+                <div className="space-y-2">
+                  {hrZones.map((zone, index) => (
+                    <div
+                      key={zone.zone}
+                      className="grid grid-cols-[2.5rem_1fr_4rem_4rem_1fr] items-center gap-2"
+                    >
+                      <span className="text-xs font-bold text-slate-700">{zone.zone}</span>
+                      <span className="text-xs text-slate-600">{zone.description}</span>
+                      <input
+                        type="number"
+                        placeholder="—"
+                        value={zone.minBpm ?? ''}
+                        onChange={(e) => {
+                          const next = [...hrZones];
+                          const raw = e.target.value.trim();
+                          next[index] = {
+                            ...zone,
+                            minBpm: raw ? Number(raw) : undefined,
+                          };
+                          setHrZones(next);
+                        }}
+                        className="rounded-lg border border-slate-200 px-2 py-1.5 text-xs"
+                      />
+                      <input
+                        type="number"
+                        placeholder="—"
+                        value={zone.maxBpm ?? ''}
+                        onChange={(e) => {
+                          const next = [...hrZones];
+                          const raw = e.target.value.trim();
+                          next[index] = {
+                            ...zone,
+                            maxBpm: raw ? Number(raw) : undefined,
+                          };
+                          setHrZones(next);
+                        }}
+                        className="rounded-lg border border-slate-200 px-2 py-1.5 text-xs"
+                      />
+                      <input
+                        type="text"
+                        placeholder="<130"
+                        value={zone.label}
+                        onChange={(e) => {
+                          const next = [...hrZones];
+                          next[index] = { ...zone, label: e.target.value };
+                          setHrZones(next);
                         }}
                         className="rounded-lg border border-slate-200 px-2 py-1.5 text-xs"
                       />

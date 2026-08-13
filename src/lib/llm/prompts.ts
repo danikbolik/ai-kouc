@@ -1,4 +1,4 @@
-import { buildEnhancedAthleteProfile } from '@/lib/athleteProfileContext';
+import { buildEnhancedAthleteProfile, buildMultiStageRaceWeekendRules } from '@/lib/athleteProfileContext';
 import { buildIntervalDescription } from '@/lib/intervalBuilder';
 import { WORKOUT_PLAN_CHAT_FORMAT_EXAMPLE } from '@/lib/workoutPlanChatFormat';
 import { formatWorkoutExtrasForAi, getPlannedWorkoutTotalDistanceKm } from '@/lib/workoutExtras';
@@ -184,6 +184,10 @@ function buildQuerySpecificInstructions(message: string): string {
     /uprav|oprav|změn|zmen|přeplánuj|preplanuj|korek|nahraď|nahrad|vyměň|vymen|únava|unava|rychl|objem|trvá|trva|chci|zachovat|mikrocykl|týden|tyden|přetíž|pretiz|regener/.test(
       lower,
     );
+  const isMultiStageRaceQuery =
+    /etap|etapy|víkend|vikend|víkendov|vikendov|\d+\s*[x×]|kol\s*ob|multi|stejn.*závod|stejn.*zavod/.test(
+      lower,
+    );
 
   const parts: string[] = [];
 
@@ -207,6 +211,10 @@ Neodpovídej suchým „Provedl jsem úpravy". Struktura odpovědi:
 
 Příklad povinného formátu výstupu v chatu:
 ${WORKOUT_PLAN_CHAT_FORMAT_EXAMPLE}`);
+  }
+
+  if (isMultiStageRaceQuery) {
+    parts.push(buildMultiStageRaceWeekendRules());
   }
 
   return parts.length > 0 ? parts.join('\n\n') : '';
@@ -279,7 +287,7 @@ ${calendarContext}
 
 ## Instrukce pro analýzu
 1. Primární metriky: čas v zónách (TiZ), polarizace, skladba tréninků, ACWR/trendy a makrocyklus – kilometráž je jen doplňkový kontext.
-2. Vyhodnocuj každý běh podle individuálních tepových a tempových zón sportovce – uveď konkrétní zónu (např. „TF 135 = čistá Z1").
+2. Vyhodnocuj každý běh podle individuálních tepových zón BPM z profilu – uveď přesnou zónu (např. „TF 142 = Z2 (130–145 bpm)"). NIKDY neoznačuj TF 165 jako Z1–Z2.
 3. Hodnoť trénink v kontextu AKTUÁLNÍ FÁZE makrocyklu (zimní báze ≠ taper ≠ objemový blok).
 4. Porovnej nadcházející plán s dlouhodobou historií i s přesným přehledem posledních odbehaných běhů ze Stravy – cituj konkrétní dny („Ve středu jsi běžel…").
 5. Explicitně zohledni odjeté dny tohoto týdne (sekce aktuální týden) při analýze zbytku týdne.

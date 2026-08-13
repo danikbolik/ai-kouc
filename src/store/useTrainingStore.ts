@@ -32,6 +32,7 @@ import { createStravaDayData } from '../lib/strava';
 import type { CoachNote, CoachNoteInput } from '../types/coachNotes';
 import type { RecalculateRequest, CalendarAction } from '../types/api';
 import {
+  DEFAULT_HR_ZONES,
   DEFAULT_PACE_ZONES,
   DEFAULT_USER_METRICS,
   type UploadedMethodology,
@@ -382,6 +383,9 @@ export const useTrainingStore = create<TrainingState & TrainingActions>()(
             paceZones: snapshot.userMetrics?.paceZones?.length
               ? snapshot.userMetrics.paceZones
               : DEFAULT_PACE_ZONES,
+            hrZones: snapshot.userMetrics?.hrZones?.length
+              ? snapshot.userMetrics.hrZones
+              : DEFAULT_HR_ZONES,
           },
           coachNotes: snapshot.coachNotes ?? [],
           uploadedMethodology: snapshot.uploadedMethodology ?? [],
@@ -482,6 +486,12 @@ export const useTrainingStore = create<TrainingState & TrainingActions>()(
             state.userMetrics = {
               ...state.userMetrics,
               paceZones: DEFAULT_PACE_ZONES,
+            };
+          }
+          if (!state.userMetrics.hrZones?.length) {
+            state.userMetrics = {
+              ...state.userMetrics,
+              hrZones: DEFAULT_HR_ZONES,
             };
           }
         }

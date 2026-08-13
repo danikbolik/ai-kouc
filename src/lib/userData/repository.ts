@@ -1,7 +1,7 @@
 import { normalizeAllDays } from '../dayData';
 import { EMPTY_API_KEYS, type ApiKeys } from '../apiKeyHeaders';
 import { getSupabaseAdmin, isCloudDbConfigured } from '../supabase/server';
-import { DEFAULT_PACE_ZONES, DEFAULT_USER_METRICS } from '../../types/settings';
+import { DEFAULT_HR_ZONES, DEFAULT_PACE_ZONES, DEFAULT_USER_METRICS } from '../../types/settings';
 import type { UserDataSnapshot } from '../../types/userData';
 
 const UUID_RE =
@@ -19,6 +19,10 @@ function normalizeSnapshot(raw: Partial<UserDataSnapshot> | null | undefined): U
 
   if (!userMetrics.paceZones?.length) {
     userMetrics.paceZones = DEFAULT_PACE_ZONES;
+  }
+
+  if (!userMetrics.hrZones?.length) {
+    userMetrics.hrZones = DEFAULT_HR_ZONES;
   }
 
   return {

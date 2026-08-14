@@ -133,6 +133,7 @@ export const plannedWorkoutSchema = z.object({
   coolDown: warmCoolSegmentSchema.optional().nullable(),
   raceDetails: raceDetailsSchema.optional().nullable(),
   bookReference: bookReferenceSchema,
+  notes: z.string().optional().nullable(),
 });
 
 export const activitySchema = z.object({
@@ -153,6 +154,7 @@ export const activitySchema = z.object({
   tss: z.coerce.number().optional().nullable(),
   gapPace: z.string().optional().nullable(),
   terrainType: z.enum(['road', 'ob', 'kros', 'trail']).optional().nullable(),
+  notes: z.string().optional().nullable(),
 });
 
 export const dayDataSchema = z.object({

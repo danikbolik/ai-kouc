@@ -20,6 +20,14 @@ export interface LoadMetricsSnapshot {
   last28dTss: number;
 }
 
+export interface DailyLoadMetrics {
+  date: string;
+  tss: number;
+  ctl: number;
+  atl: number;
+  tsb: number;
+}
+
 function parsePaceMinPerKm(pace: string): number | null {
   const match = pace.match(/(\d+):(\d+)/);
   if (!match) return null;
@@ -198,6 +206,35 @@ export function computeLoadMetrics(
   const fromDate = formatDateKey(addDaysToDate(parseDate(today), -(lookbackDays - 1)));
   const dailyTss = collectDailyTss(days, userMetrics, fromDate, today);
   return computeLoadMetricsFromDailyTss(dailyTss);
+}
+
+/** Denní časová řada CTL / ATL / TSB pro graf (posledních N dní). */
+export function computeLoadMetricsTimeSeries(
+  days: Record<string, DayData>,
+  userMetrics: UserMetrics,
+  lookbackDays = 60,
+): DailyLoadMetrics[] {
+  const today = getTodayDate();
+  const fromDate = formatDateKey(addDaysToDate(parseDate(today), -(lookbackDays - 1)));
+  const dailyTss = collectDailyTss(days, userMetrics, fromDate, today);
+
+  let ctl = 0;
+  let atl = 0;
+  const series: DailyLoadMetrics[] = [];
+
+  for (const entry of dailyTss) {
+    ctl = ewmaStep(ctl, entry.tss, 42);
+    atl = ewmaStep(atl, entry.tss, 7);
+    series.push({
+      date: entry.date,
+      tss: entry.tss,
+      ctl: Math.round(ctl * 10) / 10,
+      atl: Math.round(atl * 10) / 10,
+      tsb: Math.round((ctl - atl) * 10) / 10,
+    });
+  }
+
+  return series;
 }
 
 export function formatActivityLoadLine(activity: Activity, userMetrics: UserMetrics): string {

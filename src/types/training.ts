@@ -145,6 +145,9 @@ export interface Activity {
   /** Typ terénu pro OB/kros logiku */
   terrainType?: 'road' | 'ob' | 'kros' | 'trail';
 
+  /** Poznámka běžce k provedenému běhu */
+  notes?: string;
+
 }
 
 
@@ -189,6 +192,9 @@ export interface PlannedWorkout {
 
   };
 
+  /** Poznámka běžce ke konkrétnímu tréninku (pro AI analýzy). */
+  notes?: string;
+
 }
 
 
@@ -216,6 +222,8 @@ export interface WorkoutSession {
     targetHR?: number;
 
     description: string;
+
+    notes?: string;
 
     bookReference?: {
 

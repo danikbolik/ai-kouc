@@ -24,8 +24,10 @@ export function buildFullCalendarContext(days: DayData[]): string {
       const sessionLines = [
         ...normalized.plannedWorkouts.map((w) => formatPlannedWorkoutLine(w)),
         ...normalized.activities.map(
-          (a) =>
-            `- [${a.phase ?? '?'}] ${a.title} (actual/Strava) | ${a.distanceKm} km @ ${a.avgPace}, HR ${a.avgHR}`,
+          (a) => {
+            const notePart = a.notes ? ` | poznámka: "${a.notes}"` : '';
+            return `- [${a.phase ?? '?'}] ${a.title} (actual/Strava) | ${a.distanceKm} km @ ${a.avgPace}, HR ${a.avgHR}${notePart}`;
+          },
         ),
       ].join('\n');
 
@@ -55,6 +57,7 @@ function formatPlannedWorkoutLine(workout: PlannedWorkout): string {
   }
 
   if (workout.isLocked) line += ' 🔒 LOCKED';
+  if (workout.notes?.trim()) line += ` | poznámka: "${workout.notes.trim()}"`;
   line += formatWorkoutExtrasForAi(workout);
   return line;
 }

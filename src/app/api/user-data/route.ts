@@ -39,7 +39,9 @@ export async function GET(request: Request) {
     });
   } catch (error) {
     console.error('[API /user-data GET]', error);
-    return NextResponse.json({ error: 'Nepodařilo se načíst cloud data.' }, { status: 500 });
+    const detail =
+      error instanceof Error ? error.message : 'Nepodařilo se načíst cloud data.';
+    return NextResponse.json({ error: detail }, { status: 500 });
   }
 }
 
@@ -80,6 +82,8 @@ async function saveFromRequest(request: Request) {
     });
   } catch (error) {
     console.error('[API /user-data PUT]', error);
-    return NextResponse.json({ error: 'Nepodařilo se uložit cloud data.' }, { status: 500 });
+    const detail =
+      error instanceof Error ? error.message : 'Nepodařilo se uložit cloud data.';
+    return NextResponse.json({ error: detail }, { status: 500 });
   }
 }

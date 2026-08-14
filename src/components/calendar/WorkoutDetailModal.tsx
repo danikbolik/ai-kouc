@@ -192,6 +192,7 @@ export function WorkoutDetailModal() {
   const days = useTrainingStore((s) => s.days);
   const closeDetailModal = useTrainingStore((s) => s.closeDetailModal);
   const updateFeedback = useTrainingStore((s) => s.updateFeedback);
+  const updateWorkoutNotes = useTrainingStore((s) => s.updateWorkoutNotes);
   const recalculatePlan = useTrainingStore((s) => s.recalculatePlan);
   const isRecalculating = useTrainingStore((s) => s.isRecalculating);
 
@@ -203,6 +204,8 @@ export function WorkoutDetailModal() {
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [readinessScore, setReadinessScore] = useState(5);
   const [userComment, setUserComment] = useState('');
+  const [workoutNotes, setWorkoutNotes] = useState('');
+  const [notesSaved, setNotesSaved] = useState(false);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -213,6 +216,10 @@ export function WorkoutDetailModal() {
 
     setReadinessScore(dayData?.feedback?.readinessScore ?? 5);
     setUserComment(dayData?.feedback?.userComment ?? '');
+
+    const initialSession = sessions.find((s) => s.id === initialSessionId) ?? sessions[0];
+    setWorkoutNotes(initialSession?.planned?.notes ?? '');
+    setNotesSaved(false);
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') closeDetailModal();
@@ -227,12 +234,25 @@ export function WorkoutDetailModal() {
     };
   }, [isOpen, selectedDate, selectedSessionId, dayData, sessions, closeDetailModal]);
 
+  const activeSession = sessions.find((s) => s.id === activeSessionId) ?? sessions[0];
+
+  useEffect(() => {
+    if (!isOpen || !activeSession) return;
+    setWorkoutNotes(activeSession.planned?.notes ?? '');
+    setNotesSaved(false);
+  }, [isOpen, activeSession?.id, activeSession?.planned?.notes]);
+
   if (!isOpen) return null;
 
-  const activeSession = sessions.find((s) => s.id === activeSessionId) ?? sessions[0];
   const showReadiness = timeState === 'today';
-  const showCommentFeedback = timeState === 'past' || timeState === 'today';
   const showRecalculate = showReadiness && readinessScore >= 8;
+
+  const handleSaveWorkoutNotes = () => {
+    if (!activeSession) return;
+    updateWorkoutNotes(selectedDate, activeSession.id, workoutNotes);
+    setNotesSaved(true);
+    window.setTimeout(() => setNotesSaved(false), 2000);
+  };
 
   const handleSaveFeedback = () => {
     updateFeedback(selectedDate, {
@@ -371,25 +391,67 @@ export function WorkoutDetailModal() {
             </section>
           )}
 
-          {/* Sekce 3: Komentář */}
-          {showCommentFeedback && (
+          {/* Sekce 3: Poznámka ke konkrétnímu tréninku */}
+          {activeSession && (
             <section className="rounded-xl border border-slate-200 p-4">
               <h3 className="mb-4 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                Zpětná vazba k tréninku
+                Poznámka k tréninku
               </h3>
 
               <label className="block">
-                <span className="mb-1 block text-sm font-medium text-slate-700">Komentář</span>
+                <span className="mb-1 block text-sm font-medium text-slate-700">
+                  Co jsi cítil, co fungovalo, co ne?
+                </span>
                 <textarea
-                  value={userComment}
-                  onChange={(e) => setUserComment(e.target.value)}
+                  value={workoutNotes}
+                  onChange={(e) => {
+                    setWorkoutNotes(e.target.value);
+                    setNotesSaved(false);
+                  }}
+                  onBlur={handleSaveWorkoutNotes}
                   rows={3}
-                  placeholder='Např. "Cítil jsem zatuhlé achilovky"'
+                  placeholder='Např. "Cítil jsem zatuhlé achilovky po 8. km"'
                   className="w-full resize-none rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 outline-none ring-emerald-500 focus:ring-2"
                 />
               </label>
+
+              <div className="mt-2 flex items-center justify-between gap-2">
+                <button
+                  type="button"
+                  onClick={handleSaveWorkoutNotes}
+                  className="rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-slate-800"
+                >
+                  Uložit poznámku
+                </button>
+                {notesSaved && (
+                  <span className="text-xs font-medium text-emerald-600">Uloženo do cloudu</span>
+                )}
+              </div>
             </section>
           )}
+
+          {/* Sekce 4: Denní komentář / feedback */}
+          <section className="rounded-xl border border-slate-200 p-4">
+            <h3 className="mb-4 text-xs font-semibold uppercase tracking-wide text-slate-500">
+              Zpětná vazba k dni
+            </h3>
+
+            <label className="block">
+              <span className="mb-1 block text-sm font-medium text-slate-700">Celkový komentář k dni</span>
+              <textarea
+                value={userComment}
+                onChange={(e) => setUserComment(e.target.value)}
+                onBlur={() =>
+                  updateFeedback(selectedDate, {
+                    userComment: userComment.trim() || undefined,
+                  })
+                }
+                rows={3}
+                placeholder='Např. "Celkově náročný den, spal jsem málo"'
+                className="w-full resize-none rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 outline-none ring-emerald-500 focus:ring-2"
+              />
+            </label>
+          </section>
         </div>
 
         {/* Footer */}
@@ -426,7 +488,7 @@ export function WorkoutDetailModal() {
             >
               Zavřít
             </button>
-            {(showReadiness || showCommentFeedback) && (
+            {(showReadiness || userComment.trim()) && (
               <button
                 type="button"
                 onClick={handleSaveFeedback}

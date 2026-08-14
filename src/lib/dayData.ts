@@ -146,6 +146,7 @@ export function dayToLegacySessions(day: DayData): WorkoutSession[] {
         targetPace: planned.targetPace,
         targetHR: planned.targetHR,
         bookReference: planned.bookReference,
+        notes: planned.notes,
       },
       actual: matchedActivity
         ? {
@@ -174,7 +175,10 @@ export function dayToLegacySessions(day: DayData): WorkoutSession[] {
       title: activity.title,
       type: activity.type,
       isLocked: false,
-      planned: { description: 'Synchronizováno ze Stravy.' },
+      planned: {
+        description: 'Synchronizováno ze Stravy.',
+        notes: activity.notes,
+      },
       actual: {
         distanceKm: activity.distanceKm,
         durationMin: activity.durationMin,

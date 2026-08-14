@@ -53,8 +53,9 @@ export async function getUserData(userId: string): Promise<UserDataSnapshot | nu
     .maybeSingle();
 
   if (error) {
-    console.error('[userDataRepository.getUserData]', error);
-    throw new Error('Nepodařilo se načíst data z cloudu.');
+    const detail = error.message ?? error.code ?? JSON.stringify(error);
+    console.error('[userDataRepository.getUserData]', { userId, detail, error });
+    throw new Error(`Nepodařilo se načíst data z cloudu: ${detail}`);
   }
 
   if (!data) return null;
@@ -75,7 +76,15 @@ export async function saveUserData(
     throw new Error('Cloud databáze není nakonfigurována.');
   }
 
-  const existing = await getUserData(userId);
+  let existing: UserDataSnapshot | null = null;
+  try {
+    existing = await getUserData(userId);
+  } catch (error) {
+    console.warn('[userDataRepository.saveUserData] Existing row load failed, upserting snapshot', {
+      userId,
+      error,
+    });
+  }
 
   const payload: UserDataSnapshot = normalizeSnapshot({
     ...snapshot,
@@ -100,8 +109,9 @@ export async function saveUserData(
     .single();
 
   if (error) {
-    console.error('[userDataRepository.saveUserData]', error);
-    throw new Error('Nepodařilo se uložit data do cloudu.');
+    const detail = error.message ?? error.code ?? JSON.stringify(error);
+    console.error('[userDataRepository.saveUserData]', { userId, detail, error });
+    throw new Error(`Nepodařilo se uložit data do cloudu: ${detail}`);
   }
 
   const savedPayload = (data.payload ?? {}) as Partial<UserDataSnapshot>;

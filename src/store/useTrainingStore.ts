@@ -90,6 +90,7 @@ interface TrainingActions {
   applyCalendarActions: (actions: CalendarAction[]) => number;
   toggleLockWorkout: (date: string, sessionId: string) => void;
   updateFeedback: (date: string, feedback: Partial<DayData['feedback']>) => void;
+  updateWorkoutNotes: (date: string, sessionId: string, notes: string) => void;
   recalculatePlan: (fromDate: string) => Promise<void>;
   setStravaConnected: (connected: boolean) => void;
   setStravaError: (error: string | null) => void;
@@ -316,6 +317,40 @@ export const useTrainingStore = create<TrainingState & TrainingActions>()(
           };
         }),
 
+      updateWorkoutNotes: (date, sessionId, notes) =>
+        set((state) => {
+          const day = normalizeDayData(state.days[date] ?? emptyDay(date));
+          const trimmed = notes.trim();
+
+          const plannedIdx = day.plannedWorkouts.findIndex((w) => w.id === sessionId);
+          if (plannedIdx >= 0) {
+            const plannedWorkouts = [...day.plannedWorkouts];
+            plannedWorkouts[plannedIdx] = {
+              ...plannedWorkouts[plannedIdx],
+              notes: trimmed || undefined,
+            };
+            return {
+              days: bumpDay(state.days, date, { ...day, plannedWorkouts }),
+              calendarRevision: state.calendarRevision + 1,
+            };
+          }
+
+          const activityIdx = day.activities.findIndex((a) => a.id === sessionId);
+          if (activityIdx >= 0) {
+            const activities = [...day.activities];
+            activities[activityIdx] = {
+              ...activities[activityIdx],
+              notes: trimmed || undefined,
+            };
+            return {
+              days: bumpDay(state.days, date, { ...day, activities }),
+              calendarRevision: state.calendarRevision + 1,
+            };
+          }
+
+          return state;
+        }),
+
       recalculatePlan: async (fromDate) => {
         const state = get();
         if (state.isRecalculating) return;
@@ -488,7 +523,13 @@ export const useTrainingStore = create<TrainingState & TrainingActions>()(
             activitiesByDate: Record<string, Activity[]>;
             lastStravaSyncAt?: string;
             lastStravaActivityAt?: number | null;
+            cloudSaveWarning?: string | null;
+            cloudWarnings?: string[];
           };
+
+          if (data.cloudSaveWarning) {
+            console.warn('[syncLatestStravaActivities] Cloud metadata warning:', data.cloudSaveWarning);
+          }
 
           set((state) => applyStravaSyncPayload(state, data));
         } catch (error) {

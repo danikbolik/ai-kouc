@@ -13,7 +13,8 @@ import {
   getStravaClientSecretFromEnv,
 } from '@/lib/strava/env';
 import { getValidStravaAccessToken, hasStravaConnection } from '@/lib/strava/tokenAccess';
-import { getUserData, isValidUserId, saveUserData } from '@/lib/userData/repository';
+import { tryGetUserData, trySaveStravaSyncMetadata } from '@/lib/userData/cloudAccess';
+import { isValidUserId } from '@/lib/userData/repository';
 import type { Activity } from '@/types/training';
 
 function stravaCredentials() {
@@ -45,7 +46,22 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Strava not configured' }, { status: 503 });
   }
 
-  const accessToken = await getValidStravaAccessToken(request, credentials);
+  let accessToken: string | null = null;
+  try {
+    accessToken = await getValidStravaAccessToken(request, credentials);
+  } catch (error) {
+    console.error('[Strava sync/latest] Token resolution failed:', error);
+    return NextResponse.json(
+      {
+        error:
+          error instanceof Error
+            ? `Strava token: ${error.message}`
+            : 'Nepodařilo se ověřit Strava token.',
+      },
+      { status: 401 },
+    );
+  }
+
   if (!accessToken) {
     return NextResponse.json(
       {
@@ -57,6 +73,7 @@ export async function POST(request: Request) {
   }
 
   const userId = getUserIdFromRequest(request);
+  const cloudWarnings: string[] = [];
 
   let thresholdHR: number | undefined;
   let lastActivityAt: number | undefined;
@@ -76,10 +93,18 @@ export async function POST(request: Request) {
   }
 
   try {
-    if (userId && !force) {
-      const userData = await getUserData(userId);
-      if (userData?.lastStravaSyncAt) {
-        const elapsed = Date.now() - new Date(userData.lastStravaSyncAt).getTime();
+    let cloudUserData = null;
+
+    if (userId) {
+      const cloudRead = await tryGetUserData(userId);
+      cloudUserData = cloudRead.data;
+      if (cloudRead.error) {
+        cloudWarnings.push(cloudRead.error);
+        console.warn('[Strava sync/latest] Cloud metadata unavailable:', cloudRead.error);
+      }
+
+      if (!force && cloudUserData?.lastStravaSyncAt) {
+        const elapsed = Date.now() - new Date(cloudUserData.lastStravaSyncAt).getTime();
         if (elapsed < STRAVA_SYNC_COOLDOWN_MS) {
           const retryAfterMs = STRAVA_SYNC_COOLDOWN_MS - elapsed;
           return NextResponse.json(
@@ -95,13 +120,19 @@ export async function POST(request: Request) {
     }
 
     let after = lastActivityAt;
-    if (after == null && userId) {
-      const userData = await getUserData(userId);
+    if (after == null && cloudUserData) {
       after =
-        userData?.lastStravaActivityAt ??
-        (userData?.days ? getLastStravaActivityUnix(userData.days) : null) ??
+        cloudUserData.lastStravaActivityAt ??
+        getLastStravaActivityUnix(cloudUserData.days) ??
         undefined;
     }
+
+    console.log('[Strava sync/latest] Fetching activities', {
+      userId,
+      after: after ?? null,
+      force,
+      cloudWarnings: cloudWarnings.length,
+    });
 
     const activities = await fetchActivitiesAfter(accessToken, {
       after: after ?? undefined,
@@ -127,16 +158,17 @@ export async function POST(request: Request) {
     }
 
     const syncAt = new Date().toISOString();
+    let cloudSaveWarning: string | null = null;
 
     if (userId) {
-      const userData = await getUserData(userId);
-      if (userData) {
-        await saveUserData(userId, {
-          ...userData,
-          lastStravaSyncAt: syncAt,
-          lastStravaActivityAt:
-            newestActivityAt > 0 ? newestActivityAt : userData.lastStravaActivityAt,
-        });
+      const saveResult = await trySaveStravaSyncMetadata(userId, {
+        lastStravaSyncAt: syncAt,
+        lastStravaActivityAt: newestActivityAt > 0 ? newestActivityAt : undefined,
+      });
+      if (!saveResult.ok && saveResult.error) {
+        cloudSaveWarning = saveResult.error;
+        cloudWarnings.push(saveResult.error);
+        console.warn('[Strava sync/latest] Cloud metadata save failed:', saveResult.error);
       }
     }
 
@@ -148,9 +180,11 @@ export async function POST(request: Request) {
       lastStravaActivityAt: newestActivityAt > 0 ? newestActivityAt : null,
       syncedDates: Array.from(activitiesByDate.keys()),
       activitiesByDate: activitiesByDateObject,
+      cloudWarnings: cloudWarnings.length > 0 ? cloudWarnings : undefined,
+      cloudSaveWarning,
     });
   } catch (error) {
-    console.error('[Strava sync/latest]', error);
+    console.error('[Strava sync/latest] Sync failed:', error);
 
     if (error instanceof StravaRateLimitError) {
       return NextResponse.json({ error: error.message }, { status: 429 });

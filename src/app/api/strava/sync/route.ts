@@ -56,6 +56,7 @@ export async function POST(request: Request) {
       thresholdHR = undefined;
     }
 
+    console.log('[Strava sync/full] Starting full history fetch');
     const activities = await fetchAllActivities(accessToken, { perPage: 200 });
 
     console.log('[Strava sync] Stažené aktivity:', activities.length);

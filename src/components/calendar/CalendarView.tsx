@@ -20,6 +20,7 @@ import {
 import { useTrainingStore } from '../../store/useTrainingStore';
 import { ControlBar } from './ControlBar';
 import { DayCard } from './DayCard';
+import { TrainingLoadChart } from './TrainingLoadChart';
 import { WeekSummaryCard } from './WeekSummaryCard';
 import { WeeklySummaryModal } from './WeeklySummaryModal';
 import { WorkoutDetailModal } from './WorkoutDetailModal';
@@ -27,6 +28,7 @@ import { WorkoutEditModal } from './WorkoutEditModal';
 
 export function CalendarView() {
   const days = useTrainingStore((s) => s.days);
+  const userMetrics = useTrainingStore((s) => s.userMetrics);
   const currentView = useTrainingStore((s) => s.currentView);
   const selectedDate = useTrainingStore((s) => s.selectedDate);
   const setSelectedDate = useTrainingStore((s) => s.setSelectedDate);
@@ -92,6 +94,10 @@ export function CalendarView() {
       )}
 
       <ControlBar viewDate={viewDate} onPrev={handlePrev} onNext={handleNext} onToday={handleToday} />
+
+      <div className="border-b border-slate-200 bg-slate-50 px-4 py-3">
+        <TrainingLoadChart days={days} userMetrics={userMetrics} lookbackDays={60} />
+      </div>
 
       <WorkoutDetailModal />
       <WorkoutEditModal />

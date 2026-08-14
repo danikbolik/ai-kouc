@@ -112,6 +112,7 @@ function normalizeUpdatedDays(
           ...a,
           stravaActivityId: stripNull(a.stravaActivityId),
           stravaStartAt: stripNull(a.stravaStartAt),
+          notes: stripNull(a.notes),
           durationMin: stripNull(a.durationMin),
           elevationGainM: stripNull(a.elevationGainM),
           tss: stripNull(a.tss),

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 
 import { useStravaStatus } from '@/hooks/useStravaStatus';
 import { getOrCreateUserId } from '@/lib/userId';
@@ -16,9 +16,11 @@ export function StravaSettings({ active }: { active: boolean }) {
   const isStravaSyncing = useTrainingStore((s) => s.isStravaSyncing);
   const stravaError = useTrainingStore((s) => s.stravaError);
   const setStravaConnected = useTrainingStore((s) => s.setStravaConnected);
-  const setStravaError = useTrainingStore((s) => s.setStravaError);
-  const syncStravaActivities = useTrainingStore((s) => s.syncStravaActivities);
+  const syncLatestStravaActivities = useTrainingStore((s) => s.syncLatestStravaActivities);
+  const syncFullStravaHistory = useTrainingStore((s) => s.syncFullStravaHistory);
   const disconnectStrava = useTrainingStore((s) => s.disconnectStrava);
+
+  const [confirmFullSync, setConfirmFullSync] = useState(false);
 
   const { connected } = useStravaStatus(active);
 
@@ -26,13 +28,23 @@ export function StravaSettings({ active }: { active: boolean }) {
     if (connected) setStravaConnected(true);
   }, [connected, setStravaConnected]);
 
+  const handleFullSync = () => {
+    if (!confirmFullSync) {
+      setConfirmFullSync(true);
+      return;
+    }
+    setConfirmFullSync(false);
+    void syncFullStravaHistory();
+  };
+
   return (
     <section className="space-y-4">
       <div>
         <h3 className="text-sm font-semibold text-slate-900">Strava Integrace</h3>
         <p className="mt-1 text-xs text-slate-500">
-          Oficiální OAuth2 přihlášení na jeden klik. Synchronizace stáhne kompletní historii běhů
-          ze Stravy (paginace po 200 aktivitách) a doplní je do kalendáře.
+          Oficiální OAuth2 přihlášení na jeden klik. Běžná synchronizace stáhne pouze nové běhy
+          od poslední aktivity (parametr <code className="text-[10px]">after</code>) a šetří API
+          limit. Kompletní historie je k dispozici ručně s varováním.
         </p>
       </div>
 
@@ -66,20 +78,44 @@ export function StravaSettings({ active }: { active: boolean }) {
             </button>
           ) : (
             <div className="flex flex-col gap-3">
-              <p className="text-xs text-slate-500">
-                Synchronizovat kompletní historii běhů — vzdálenost, čas, tempo a tepy se zapíší
-                do kalendáře.
-              </p>
               <button
                 type="button"
-                onClick={() => syncStravaActivities()}
+                onClick={() => syncLatestStravaActivities({ force: true })}
                 disabled={isStravaSyncing}
                 className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-6 py-4 text-base font-semibold text-white transition-colors hover:bg-emerald-700 disabled:opacity-60"
               >
                 {isStravaSyncing
-                  ? 'Synchronizuji historii…'
-                  : '🔄 Synchronizovat kompletní historii'}
+                  ? 'Synchronizuji…'
+                  : '⚡ Aktualizovat nejnovější běhy'}
               </button>
+
+              <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-3">
+                <p className="text-xs text-amber-900">
+                  {confirmFullSync
+                    ? '⚠️ Kompletní historie stáhne všechny běhy od začátku (paginace po 200). Spotřebuje hodně Strava API limitu. Opravdu pokračovat?'
+                    : 'Kompletní historie stáhne celé archivum — používej jen při prvním importu nebo obnově dat.'}
+                </p>
+                <button
+                  type="button"
+                  onClick={handleFullSync}
+                  disabled={isStravaSyncing}
+                  className="mt-2 w-full rounded-lg border border-amber-300 bg-white px-4 py-2 text-xs font-semibold text-amber-900 transition-colors hover:bg-amber-100 disabled:opacity-60"
+                >
+                  {confirmFullSync
+                    ? '✓ Ano, stáhnout kompletní historii'
+                    : '🔄 Obnovit kompletní historii'}
+                </button>
+                {confirmFullSync && (
+                  <button
+                    type="button"
+                    onClick={() => setConfirmFullSync(false)}
+                    className="mt-2 w-full text-xs text-amber-800 underline"
+                  >
+                    Zrušit
+                  </button>
+                )}
+              </div>
+
               <button
                 type="button"
                 onClick={disconnectStrava}

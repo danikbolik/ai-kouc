@@ -36,6 +36,8 @@ function normalizeSnapshot(raw: Partial<UserDataSnapshot> | null | undefined): U
     },
     stravaConnected: raw?.stravaConnected ?? false,
     stravaTokens: raw?.stravaTokens ?? null,
+    lastStravaSyncAt: raw?.lastStravaSyncAt,
+    lastStravaActivityAt: raw?.lastStravaActivityAt,
     updatedAt: raw?.updatedAt ?? new Date(0).toISOString(),
   };
 }

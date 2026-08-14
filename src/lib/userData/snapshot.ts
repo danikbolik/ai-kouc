@@ -11,6 +11,8 @@ export interface PersistedStoreSlice {
   uploadedMethodology: UploadedMethodology[];
   apiKeys: ApiKeys;
   stravaConnected: boolean;
+  lastStravaSyncAt: string | null;
+  lastStravaActivityAt: number | null;
 }
 
 export function extractPersistedSnapshot(
@@ -24,6 +26,8 @@ export function extractPersistedSnapshot(
     uploadedMethodology: slice.uploadedMethodology,
     apiKeys: slice.apiKeys,
     stravaConnected: slice.stravaConnected,
+    lastStravaSyncAt: slice.lastStravaSyncAt ?? undefined,
+    lastStravaActivityAt: slice.lastStravaActivityAt ?? undefined,
     stravaTokens: undefined,
     updatedAt,
   };
@@ -37,6 +41,8 @@ export function pickPersistedSlice(state: PersistedStoreSlice): PersistedStoreSl
     uploadedMethodology: state.uploadedMethodology,
     apiKeys: state.apiKeys,
     stravaConnected: state.stravaConnected,
+    lastStravaSyncAt: state.lastStravaSyncAt,
+    lastStravaActivityAt: state.lastStravaActivityAt,
   };
 }
 

@@ -110,6 +110,9 @@ export interface Activity {
 
   stravaActivityId?: number;
 
+  /** Unix timestamp (s) startu aktivity ze Stravy – pro inkrementální sync. */
+  stravaStartAt?: number;
+
   title: string;
 
   type: ActivityType;

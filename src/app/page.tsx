@@ -12,7 +12,8 @@ export default function HomePage() {
   const activeTab = useTrainingStore((s) => s.activeTab);
   const setStravaConnected = useTrainingStore((s) => s.setStravaConnected);
   const setStravaError = useTrainingStore((s) => s.setStravaError);
-  const syncStravaActivities = useTrainingStore((s) => s.syncStravaActivities);
+  const syncLatestStravaActivities = useTrainingStore((s) => s.syncLatestStravaActivities);
+  const maybeAutoSyncStrava = useTrainingStore((s) => s.maybeAutoSyncStrava);
   const setSettingsOpen = useTrainingStore((s) => s.setSettingsOpen);
 
   useEffect(() => {
@@ -23,7 +24,7 @@ export default function HomePage() {
       setStravaConnected(true);
       setSettingsOpen(true);
 
-      const runSync = () => void syncStravaActivities();
+      const runSync = () => void syncLatestStravaActivities({ force: true });
       window.setTimeout(runSync, 500);
 
       params.delete('strava');
@@ -40,7 +41,15 @@ export default function HomePage() {
       const newUrl = `${window.location.pathname}${params.toString() ? `?${params}` : ''}`;
       window.history.replaceState({}, '', newUrl);
     }
-  }, [setStravaConnected, setStravaError, syncStravaActivities, setSettingsOpen]);
+  }, [setStravaConnected, setStravaError, syncLatestStravaActivities, setSettingsOpen]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      void maybeAutoSyncStrava();
+    }, 2500);
+
+    return () => window.clearTimeout(timer);
+  }, [maybeAutoSyncStrava]);
 
   return (
     <div className="flex min-h-screen flex-col bg-slate-50">

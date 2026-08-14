@@ -20,7 +20,7 @@ export function ControlBar({ viewDate, onPrev, onNext, onToday }: ControlBarProp
   const currentView = useTrainingStore((s) => s.currentView);
   const setCurrentView = useTrainingStore((s) => s.setCurrentView);
   const isStravaSyncing = useTrainingStore((s) => s.isStravaSyncing);
-  const syncStravaActivities = useTrainingStore((s) => s.syncStravaActivities);
+  const syncLatestStravaActivities = useTrainingStore((s) => s.syncLatestStravaActivities);
   const stravaConnected = useTrainingStore((s) => s.stravaConnected);
   const openEditModal = useTrainingStore((s) => s.openEditModal);
   const selectedDate = useTrainingStore((s) => s.selectedDate);
@@ -82,9 +82,9 @@ export function ControlBar({ viewDate, onPrev, onNext, onToday }: ControlBarProp
         {stravaConnected && (
           <button
             type="button"
-            onClick={() => syncStravaActivities()}
+            onClick={() => syncLatestStravaActivities({ force: true })}
             disabled={isStravaSyncing}
-            title="Synchronizovat kompletní historii Stravy"
+            title="Aktualizovat nejnovější běhy ze Stravy"
             className="shrink-0 rounded-lg border border-orange-200 bg-orange-50 px-3 py-1.5 text-xs font-semibold text-orange-800 transition-colors hover:bg-orange-100 disabled:opacity-60"
           >
             {isStravaSyncing ? 'Sync…' : '🔄 Strava'}

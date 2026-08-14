@@ -16,6 +16,7 @@ import {
   calculateHrTSS,
   inferTerrainType,
 } from './loadManagement';
+import { stravaStartDateToUnix } from './strava/activityTimestamps';
 
 const STRAVA_API_BASE = 'https://www.strava.com/api/v3';
 const STRAVA_OAUTH_BASE = 'https://www.strava.com/oauth';
@@ -214,12 +215,28 @@ export interface StravaZoneDistribution {
 
 const HR_ZONE_LABELS = ['Z1', 'Z2', 'Z3', 'Z4', 'Z5'] as const;
 const DETAIL_FETCH_BATCH_SIZE = 5;
+const DETAIL_FETCH_BATCH_DELAY_MS = 300;
+
+export class StravaRateLimitError extends Error {
+  constructor(message = 'Rate Limit Exceeded') {
+    super(message);
+    this.name = 'StravaRateLimitError';
+  }
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 async function stravaFetch<T>(accessToken: string, path: string): Promise<T> {
   const response = await fetch(`${STRAVA_API_BASE}${path}`, {
     headers: { Authorization: `Bearer ${accessToken}` },
     next: { revalidate: 0 },
   });
+
+  if (response.status === 429) {
+    throw new StravaRateLimitError();
+  }
 
   if (!response.ok) {
     const error = await response.text();
@@ -346,6 +363,7 @@ export function stravaActivityToActivity(
   return {
     id: `strava-${activity.id}`,
     stravaActivityId: activity.id,
+    stravaStartAt: stravaStartDateToUnix(activity.start_date_local),
     title: activity.name?.trim() || 'Běh (Strava)',
     type: 'klus',
     phase: inferPhaseFromStart(activity.start_date_local),
@@ -403,12 +421,47 @@ export async function fetchRecentActivities(
     next: { revalidate: 0 },
   });
 
+  if (response.status === 429) {
+    throw new StravaRateLimitError();
+  }
+
   if (!response.ok) {
     const error = await response.text();
     throw new Error(`Failed to fetch Strava activities: ${error}`);
   }
 
   return response.json() as Promise<StravaActivity[]>;
+}
+
+/**
+ * Stáhne aktivity novější než `after` (inkrementální sync).
+ * Bez `after` stáhne pouze první stránku (rychlá aktualizace).
+ */
+export async function fetchActivitiesAfter(
+  accessToken: string,
+  options: { after?: number; perPage?: number; maxPages?: number } = {},
+): Promise<StravaActivity[]> {
+  const perPage = options.perPage ?? 100;
+  const maxPages = options.maxPages ?? (options.after != null ? Number.POSITIVE_INFINITY : 1);
+  const allActivities: StravaActivity[] = [];
+  let page = 1;
+
+  while (page <= maxPages) {
+    const batch = await fetchRecentActivities(accessToken, {
+      page,
+      perPage,
+      after: options.after,
+    });
+
+    if (batch.length === 0) break;
+
+    allActivities.push(...batch);
+
+    if (batch.length < perPage) break;
+    page += 1;
+  }
+
+  return allActivities;
 }
 
 /** Stáhne kompletní historii aktivit sportovce (paginace bez časového limitu) */
@@ -437,12 +490,21 @@ export async function fetchAllActivities(
   return allActivities;
 }
 
-/** @deprecated Použij fetchAllActivities – zachováno pro zpětnou kompatibilitu */
+/** @deprecated Použij fetchActivitiesAfter nebo fetchAllActivities */
 export async function fetchActivitiesSince(
   accessToken: string,
-  options: { daysBack?: number; perPage?: number } = {},
+  options: { daysBack?: number; perPage?: number; after?: number } = {},
 ): Promise<StravaActivity[]> {
-  return fetchAllActivities(accessToken, { perPage: options.perPage ?? 200 });
+  const after =
+    options.after ??
+    (options.daysBack != null
+      ? Math.floor(Date.now() / 1000) - options.daysBack * 86400
+      : undefined);
+
+  return fetchActivitiesAfter(accessToken, {
+    after,
+    perPage: options.perPage ?? 200,
+  });
 }
 
 /** Stáhne detail jedné aktivity (pro webhook handler) */
@@ -524,6 +586,10 @@ export async function buildActivitiesByDate(
         result.set(dateKey, existing);
       }),
     );
+
+    if (i + DETAIL_FETCH_BATCH_SIZE < allRuns.length) {
+      await sleep(DETAIL_FETCH_BATCH_DELAY_MS);
+    }
   }
 
   return result;

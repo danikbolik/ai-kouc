@@ -1,5 +1,6 @@
 import { cookies } from 'next/headers';
 
+import { TOKEN_REFRESH_BUFFER_SEC } from '@/lib/strava/constants';
 import { getUserData, isValidUserId, saveStravaTokensForUser } from '@/lib/userData/repository';
 import { refreshStravaToken, type StravaTokenResponse } from '@/lib/strava';
 
@@ -7,8 +8,6 @@ interface StravaCredentials {
   clientId?: string;
   clientSecret?: string;
 }
-
-const TOKEN_REFRESH_BUFFER_SEC = 300;
 
 interface ResolvedStravaTokens {
   accessToken: string;
@@ -122,6 +121,62 @@ export async function hasStravaConnection(request: Request): Promise<boolean> {
  * Vrátí platný access token – načte z cookies/Supabase, při expiraci automaticky obnoví
  * přes refresh_token a uloží nové tokeny zpět do cookies i Supabase.
  */
+async function refreshAndPersistTokens(
+  tokens: ResolvedStravaTokens,
+  userId: string | null,
+  credentials: StravaCredentials,
+): Promise<string | null> {
+  if (!tokens.refreshToken) {
+    console.error('[getValidStravaAccessToken] Token expired and no refresh_token');
+    return null;
+  }
+
+  try {
+    console.log('[getValidStravaAccessToken] Refreshing expired Strava token…');
+    const refreshed = await refreshStravaToken(tokens.refreshToken, credentials);
+    await persistStravaTokens(refreshed, userId);
+    return refreshed.access_token;
+  } catch (error) {
+    console.error('[getValidStravaAccessToken] Refresh failed:', error);
+    return null;
+  }
+}
+
+/**
+ * Vrátí platný access token pro daného uživatele – načte z Supabase,
+ * při expiraci (< 5 min) automaticky obnoví přes refresh_token.
+ */
+export async function getValidStravaAccessTokenForUser(
+  userId: string,
+  credentials: StravaCredentials,
+): Promise<string | null> {
+  if (!isValidUserId(userId)) return null;
+
+  try {
+    const cloud = await getUserData(userId);
+    const cloudTokens = cloud?.stravaTokens;
+
+    if (!cloudTokens?.accessToken && !cloudTokens?.refreshToken) {
+      return null;
+    }
+
+    const tokens: ResolvedStravaTokens = {
+      accessToken: cloudTokens.accessToken ?? '',
+      refreshToken: cloudTokens.refreshToken ?? '',
+      expiresAt: cloudTokens.expiresAt ?? 0,
+    };
+
+    if (tokens.accessToken && !isTokenExpired(tokens.expiresAt)) {
+      return tokens.accessToken;
+    }
+
+    return refreshAndPersistTokens(tokens, userId, credentials);
+  } catch (error) {
+    console.error('[getValidStravaAccessTokenForUser] Cloud load failed:', error);
+    return null;
+  }
+}
+
 export async function getValidStravaAccessToken(
   request: Request,
   credentials: StravaCredentials,
@@ -137,20 +192,7 @@ export async function getValidStravaAccessToken(
     return tokens.accessToken;
   }
 
-  if (!tokens.refreshToken) {
-    console.error('[getValidStravaAccessToken] Token expired and no refresh_token');
-    return null;
-  }
-
-  try {
-    console.log('[getValidStravaAccessToken] Refreshing expired Strava token…');
-    const refreshed = await refreshStravaToken(tokens.refreshToken, credentials);
-    await persistStravaTokens(refreshed, userId);
-    return refreshed.access_token;
-  } catch (error) {
-    console.error('[getValidStravaAccessToken] Refresh failed:', error);
-    return null;
-  }
+  return refreshAndPersistTokens(tokens, userId, credentials);
 }
 
 export { TOKEN_REFRESH_BUFFER_SEC };

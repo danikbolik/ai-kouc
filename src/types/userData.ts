@@ -19,6 +19,10 @@ export interface UserDataSnapshot {
   apiKeys: ApiKeys;
   stravaConnected: boolean;
   stravaTokens?: StravaTokensSnapshot | null;
+  /** ISO timestamp poslední Strava synchronizace (cooldown 3 h). */
+  lastStravaSyncAt?: string;
+  /** Unix timestamp (s) poslední uložené Strava aktivity. */
+  lastStravaActivityAt?: number;
   updatedAt: string;
 }
 

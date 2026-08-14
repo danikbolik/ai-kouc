@@ -138,6 +138,7 @@ export const plannedWorkoutSchema = z.object({
 export const activitySchema = z.object({
   id: z.string(),
   stravaActivityId: z.coerce.number().optional().nullable(),
+  stravaStartAt: z.coerce.number().optional().nullable(),
   title: z.string(),
   type: activityTypeSchema.catch('klus'),
   phase: z.enum(['AM', 'PM', 'EVENING']).optional(),

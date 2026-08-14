@@ -4,6 +4,7 @@ import {
   buildActivitiesByDate,
   fetchAllActivities,
   isStravaConfigured,
+  StravaRateLimitError,
 } from '@/lib/strava';
 import {
   getStravaClientIdFromEnv,
@@ -77,6 +78,11 @@ export async function POST(request: Request) {
     });
   } catch (error) {
     console.error('[Strava sync]', error);
+
+    if (error instanceof StravaRateLimitError) {
+      return NextResponse.json({ error: error.message }, { status: 429 });
+    }
+
     const message =
       error instanceof Error ? error.message : 'Synchronizace se Stravou selhala.';
     return NextResponse.json({ error: message }, { status: 500 });

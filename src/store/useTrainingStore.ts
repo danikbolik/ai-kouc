@@ -29,6 +29,8 @@ import {
   getHistorySummary,
 } from '../lib/planAdaptation';
 import { createStravaDayData } from '../lib/strava';
+import { getLastStravaActivityUnix } from '../lib/strava/activityTimestamps';
+import { STRAVA_SYNC_COOLDOWN_MS } from '../lib/strava/constants';
 import type { CoachNote, CoachNoteInput } from '../types/coachNotes';
 import type { RecalculateRequest, CalendarAction } from '../types/api';
 import {
@@ -57,6 +59,8 @@ interface TrainingState {
   stravaConnected: boolean;
   isStravaSyncing: boolean;
   stravaError: string | null;
+  lastStravaSyncAt: string | null;
+  lastStravaActivityAt: number | null;
   calendarRevision: number;
   calendarAnchorDate: string;
   currentView: CalendarView;
@@ -89,6 +93,10 @@ interface TrainingActions {
   recalculatePlan: (fromDate: string) => Promise<void>;
   setStravaConnected: (connected: boolean) => void;
   setStravaError: (error: string | null) => void;
+  syncLatestStravaActivities: (options?: { force?: boolean }) => Promise<void>;
+  syncFullStravaHistory: () => Promise<void>;
+  maybeAutoSyncStrava: () => Promise<void>;
+  /** @deprecated Použij syncFullStravaHistory nebo syncLatestStravaActivities */
   syncStravaActivities: () => Promise<void>;
   disconnectStrava: () => Promise<void>;
   setApiKeys: (keys: Partial<ApiKeys>) => void;
@@ -118,6 +126,40 @@ function bumpDay(
   return { ...days, [date]: normalized };
 }
 
+function applyStravaSyncPayload(
+  state: TrainingState,
+  data: {
+    activitiesByDate: Record<string, Activity[]>;
+    lastStravaSyncAt?: string | null;
+    lastStravaActivityAt?: number | null;
+  },
+): Partial<TrainingState> {
+  let updatedDays = normalizeAllDays(state.days);
+
+  for (const [date, incomingActivities] of Object.entries(data.activitiesByDate)) {
+    const existing = updatedDays[date];
+    updatedDays[date] = existing
+      ? mergeActivitiesForDay(existing, incomingActivities, date)
+      : createStravaDayData(date, incomingActivities);
+  }
+
+  const scannedActivityAt = getLastStravaActivityUnix(updatedDays);
+  const lastStravaActivityAt =
+    data.lastStravaActivityAt ??
+    scannedActivityAt ??
+    state.lastStravaActivityAt;
+
+  return {
+    days: updatedDays,
+    stravaConnected: true,
+    isStravaSyncing: false,
+    stravaError: null,
+    lastStravaSyncAt: data.lastStravaSyncAt ?? new Date().toISOString(),
+    lastStravaActivityAt,
+    calendarRevision: state.calendarRevision + 1,
+  };
+}
+
 export const useTrainingStore = create<TrainingState & TrainingActions>()(
   persist(
     (set, get) => ({
@@ -131,6 +173,8 @@ export const useTrainingStore = create<TrainingState & TrainingActions>()(
       stravaConnected: false,
       isStravaSyncing: false,
       stravaError: null,
+      lastStravaSyncAt: null,
+      lastStravaActivityAt: null,
       calendarRevision: 0,
       calendarAnchorDate: getTodayDate(),
       currentView: 'month',
@@ -394,6 +438,8 @@ export const useTrainingStore = create<TrainingState & TrainingActions>()(
             ...snapshot.apiKeys,
           },
           stravaConnected: snapshot.stravaConnected ?? false,
+          lastStravaSyncAt: snapshot.lastStravaSyncAt ?? null,
+          lastStravaActivityAt: snapshot.lastStravaActivityAt ?? null,
         }),
 
       setCloudSyncStatus: (status) => set({ cloudSyncStatus: status }),
@@ -407,7 +453,55 @@ export const useTrainingStore = create<TrainingState & TrainingActions>()(
         window.location.href = `/api/strava/login?returnTo=${returnTo}`;
       },
 
-      syncStravaActivities: async () => {
+      syncLatestStravaActivities: async (options) => {
+        if (get().isStravaSyncing) return;
+        set({ isStravaSyncing: true, stravaError: null });
+
+        try {
+          const lastActivityAt =
+            get().lastStravaActivityAt ?? getLastStravaActivityUnix(get().days);
+
+          const response = await fetch('/api/strava/sync/latest', {
+            method: 'POST',
+            headers: buildApiKeyHeaders(get().apiKeys),
+            body: JSON.stringify({
+              thresholdHR: get().userMetrics.ANP,
+              lastActivityAt: lastActivityAt ?? undefined,
+              force: options?.force === true,
+            }),
+          });
+
+          if (!response.ok) {
+            const body = (await response.json().catch(() => ({}))) as {
+              error?: string;
+              cooldown?: boolean;
+            };
+            if (body.cooldown) {
+              set({ isStravaSyncing: false, stravaError: null });
+              return;
+            }
+            throw new Error(body.error ?? `Strava sync failed (${response.status})`);
+          }
+
+          const data = (await response.json()) as {
+            syncedDates: string[];
+            activitiesByDate: Record<string, Activity[]>;
+            lastStravaSyncAt?: string;
+            lastStravaActivityAt?: number | null;
+          };
+
+          set((state) => applyStravaSyncPayload(state, data));
+        } catch (error) {
+          console.error('[syncLatestStravaActivities]', error);
+          set({
+            isStravaSyncing: false,
+            stravaError:
+              error instanceof Error ? error.message : 'Synchronizace se Stravou selhala.',
+          });
+        }
+      },
+
+      syncFullStravaHistory: async () => {
         if (get().isStravaSyncing) return;
         set({ isStravaSyncing: true, stravaError: null });
 
@@ -429,32 +523,36 @@ export const useTrainingStore = create<TrainingState & TrainingActions>()(
             activitiesByDate: Record<string, Activity[]>;
           };
 
-          set((state) => {
-            let updatedDays = normalizeAllDays(state.days);
-
-            for (const [date, incomingActivities] of Object.entries(data.activitiesByDate)) {
-              const existing = updatedDays[date];
-              updatedDays[date] = existing
-                ? mergeActivitiesForDay(existing, incomingActivities, date)
-                : createStravaDayData(date, incomingActivities);
-            }
-
-            return {
-              days: updatedDays,
-              stravaConnected: true,
-              isStravaSyncing: false,
-              stravaError: null,
-              calendarRevision: state.calendarRevision + 1,
-            };
-          });
+          set((state) =>
+            applyStravaSyncPayload(state, {
+              ...data,
+              lastStravaSyncAt: new Date().toISOString(),
+            }),
+          );
         } catch (error) {
-          console.error('[syncStravaActivities]', error);
+          console.error('[syncFullStravaHistory]', error);
           set({
             isStravaSyncing: false,
             stravaError:
               error instanceof Error ? error.message : 'Synchronizace se Stravou selhala.',
           });
         }
+      },
+
+      maybeAutoSyncStrava: async () => {
+        const { stravaConnected, isStravaSyncing, lastStravaSyncAt } = get();
+        if (!stravaConnected || isStravaSyncing) return;
+
+        if (lastStravaSyncAt) {
+          const elapsed = Date.now() - new Date(lastStravaSyncAt).getTime();
+          if (elapsed < STRAVA_SYNC_COOLDOWN_MS) return;
+        }
+
+        await get().syncLatestStravaActivities();
+      },
+
+      syncStravaActivities: async () => {
+        await get().syncFullStravaHistory();
       },
 
       disconnectStrava: async () => {
@@ -477,6 +575,8 @@ export const useTrainingStore = create<TrainingState & TrainingActions>()(
         userMetrics: state.userMetrics,
         uploadedMethodology: state.uploadedMethodology,
         stravaConnected: state.stravaConnected,
+        lastStravaSyncAt: state.lastStravaSyncAt,
+        lastStravaActivityAt: state.lastStravaActivityAt,
         coachNotes: state.coachNotes,
       }),
       onRehydrateStorage: () => (state) => {

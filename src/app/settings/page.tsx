@@ -10,17 +10,17 @@ function SettingsRedirect() {
   const searchParams = useSearchParams();
   const setSettingsOpen = useTrainingStore((s) => s.setSettingsOpen);
   const setStravaConnected = useTrainingStore((s) => s.setStravaConnected);
-  const syncStravaActivities = useTrainingStore((s) => s.syncStravaActivities);
+  const syncLatestStravaActivities = useTrainingStore((s) => s.syncLatestStravaActivities);
 
   useEffect(() => {
     if (searchParams.get('strava') === 'connected') {
       setStravaConnected(true);
-      void syncStravaActivities();
+      void syncLatestStravaActivities({ force: true });
     }
 
     setSettingsOpen(true);
     router.replace('/');
-  }, [searchParams, router, setSettingsOpen, setStravaConnected, syncStravaActivities]);
+  }, [searchParams, router, setSettingsOpen, setStravaConnected, syncLatestStravaActivities]);
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-slate-50">

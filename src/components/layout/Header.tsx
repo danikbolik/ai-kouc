@@ -12,7 +12,7 @@ export function Header() {
   const setActiveTab = useTrainingStore((s) => s.setActiveTab);
   const setSettingsOpen = useTrainingStore((s) => s.setSettingsOpen);
   const isStravaSyncing = useTrainingStore((s) => s.isStravaSyncing);
-  const syncStravaActivities = useTrainingStore((s) => s.syncStravaActivities);
+  const syncLatestStravaActivities = useTrainingStore((s) => s.syncLatestStravaActivities);
   const cloudSyncStatus = useTrainingStore((s) => s.cloudSyncStatus);
   const stravaConnected = useTrainingStore((s) => s.stravaConnected);
 
@@ -107,9 +107,9 @@ export function Header() {
           {stravaConnected && (
             <button
               type="button"
-              onClick={() => syncStravaActivities()}
+              onClick={() => syncLatestStravaActivities({ force: true })}
               disabled={isStravaSyncing}
-              title="Synchronizovat kompletní historii Stravy"
+              title="Aktualizovat nejnovější běhy ze Stravy"
               className="hidden items-center gap-1.5 rounded-lg border border-orange-200 bg-orange-50 px-3 py-2 text-xs font-semibold text-orange-800 transition-colors hover:bg-orange-100 disabled:opacity-60 sm:flex"
               aria-label="Synchronizovat Strava"
             >

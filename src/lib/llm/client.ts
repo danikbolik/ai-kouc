@@ -111,6 +111,7 @@ function normalizeUpdatedDays(
         activities: (day.activities ?? []).map((a) => ({
           ...a,
           stravaActivityId: stripNull(a.stravaActivityId),
+          stravaStartAt: stripNull(a.stravaStartAt),
           durationMin: stripNull(a.durationMin),
           elevationGainM: stripNull(a.elevationGainM),
           tss: stripNull(a.tss),

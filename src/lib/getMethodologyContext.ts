@@ -1,18 +1,11 @@
 import fs from 'fs';
-import { createRequire } from 'module';
 import path from 'path';
 
+import { parsePdfBuffer } from '@/lib/methodology/pdfParseServer';
 import { buildFullMethodicLibraryContext } from '@/lib/ragKnowledge';
 
 const METHODOLOGY_DIR = path.join(process.cwd(), 'data', 'methodology');
 const SUPPORTED_EXTENSIONS = new Set(['.txt', '.md', '.pdf']);
-
-type PdfParseClass = new (options: { data: Buffer }) => {
-  getText: () => Promise<{ text?: string }>;
-  destroy: () => Promise<void>;
-};
-
-let cachedPdfParseClass: PdfParseClass | null = null;
 
 function getFallbackMethodologyContext(reason: string): string {
   return [
@@ -21,48 +14,13 @@ function getFallbackMethodologyContext(reason: string): string {
   ].join('\n\n');
 }
 
-/** Načte server-safe build pdf-parse (CJS), ne browser/legacy ESM export. */
-function loadPdfParseClass(): PdfParseClass {
-  if (cachedPdfParseClass) {
-    return cachedPdfParseClass;
-  }
-
-  const require = createRequire(import.meta.url);
-  const cjsPath = path.join(
-    process.cwd(),
-    'node_modules',
-    'pdf-parse',
-    'dist',
-    'pdf-parse',
-    'cjs',
-    'index.cjs',
-  );
-
-  const pdfModule = require(cjsPath) as { PDFParse: PdfParseClass };
-
-  if (!pdfModule?.PDFParse) {
-    throw new Error('PDFParse export not found in pdf-parse CJS bundle');
-  }
-
-  cachedPdfParseClass = pdfModule.PDFParse;
-  return cachedPdfParseClass;
-}
-
 function readTextFile(filePath: string): string {
   return fs.readFileSync(filePath, 'utf-8').trim();
 }
 
 async function readPdfFile(filePath: string): Promise<string> {
-  const PDFParse = loadPdfParseClass();
   const buffer = fs.readFileSync(filePath);
-  const parser = new PDFParse({ data: buffer });
-
-  try {
-    const result = await parser.getText();
-    return (result.text ?? '').trim();
-  } finally {
-    await parser.destroy();
-  }
+  return parsePdfBuffer(buffer);
 }
 
 async function readMethodologyFileContent(

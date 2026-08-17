@@ -1,5 +1,6 @@
 import { MAX_METHODOLOGY_CHARS } from '@/lib/readMethodologyFile';
 import type { UploadedMethodology } from '@/types/settings';
+import { parsePdfBuffer } from './pdfParseServer';
 
 function getExtension(fileName: string): string {
   const dot = fileName.lastIndexOf('.');
@@ -32,21 +33,14 @@ export async function parseMethodologyBuffer(
   }
 
   if (ext === '.pdf') {
-    const { PDFParse } = await import('pdf-parse');
-    const parser = new PDFParse({ data: buffer });
-    try {
-      const textResult = await parser.getText();
-      const raw = textResult.text?.trim() ?? '';
-      if (!raw) {
-        throw new Error('PDF neobsahuje extrahovatelný text (možná naskenovaný dokument).');
-      }
-      return {
-        fileType: 'pdf',
-        content: truncateContent(raw, MAX_METHODOLOGY_CHARS),
-      };
-    } finally {
-      await parser.destroy();
+    const raw = await parsePdfBuffer(buffer);
+    if (!raw) {
+      throw new Error('PDF neobsahuje extrahovatelný text (možná naskenovaný dokument).');
     }
+    return {
+      fileType: 'pdf',
+      content: truncateContent(raw, MAX_METHODOLOGY_CHARS),
+    };
   }
 
   throw new Error('Nepodporovaný formát. Povolené: .pdf, .txt, .md');

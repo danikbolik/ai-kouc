@@ -200,6 +200,9 @@ export function CloudSyncProvider({ children }: { children: React.ReactNode }) {
         if (!cancelled) setCloudSyncStatus('error', message);
       } finally {
         skipSyncRef.current = false;
+        if (!cancelled) {
+          void useTrainingStore.getState().syncMethodologyFromCloud();
+        }
       }
     }
 
@@ -271,6 +274,7 @@ export async function linkCloudAccountAndHydrate(
   if (json.data) {
     hydrateCloudData(json.data);
   }
+  await useTrainingStore.getState().syncMethodologyFromCloud();
   useTrainingStore.getState().setCloudSyncStatus('idle', null);
   return { success: true };
 }

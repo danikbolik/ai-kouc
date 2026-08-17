@@ -24,7 +24,7 @@ export function extractPersistedSnapshot(
     days: slice.days,
     userMetrics: slice.userMetrics,
     coachNotes: slice.coachNotes,
-    uploadedMethodology: slice.uploadedMethodology,
+    uploadedMethodology: [],
     apiKeys: slice.apiKeys,
     stravaConnected: slice.stravaConnected,
     lastStravaSyncAt: slice.lastStravaSyncAt ?? undefined,
@@ -32,6 +32,11 @@ export function extractPersistedSnapshot(
     stravaTokens: undefined,
     updatedAt,
   };
+}
+
+/** Lokální cache metodik – neposílat do user_data JSONB (mají vlastní tabulku + Storage). */
+export function extractLocalMethodologySlice(slice: PersistedStoreSlice): UploadedMethodology[] {
+  return slice.uploadedMethodology;
 }
 
 export function pickPersistedSlice(state: PersistedStoreSlice): PersistedStoreSlice {

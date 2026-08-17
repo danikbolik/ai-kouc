@@ -2,11 +2,13 @@
 
 import { useEffect, useState } from 'react';
 import {
-  createUploadedMethodology,
   formatFileSize,
   isSupportedMethodologyFile,
-  readMethodologyFile,
 } from '../../lib/readMethodologyFile';
+import {
+  deleteMethodologyDocumentRemote,
+  uploadMethodologyDocumentFile,
+} from '../../lib/methodology/client';
 import { linkCloudAccountAndHydrate } from '../providers/CloudSyncProvider';
 import { getOrCreateUserId, isValidUserIdFormat } from '../../lib/userId';
 import {
@@ -52,6 +54,7 @@ export function SettingsDrawer() {
   const uploadedMethodology = useTrainingStore((s) => s.uploadedMethodology);
   const addUploadedMethodology = useTrainingStore((s) => s.addUploadedMethodology);
   const removeUploadedMethodology = useTrainingStore((s) => s.removeUploadedMethodology);
+  const syncMethodologyFromCloud = useTrainingStore((s) => s.syncMethodologyFromCloud);
 
   const [activeSection, setActiveSection] = useState<SettingsSection>('personal');
 
@@ -104,6 +107,11 @@ export function SettingsDrawer() {
     setUploadError(null);
     setSaveFeedback(null);
   }, [isSettingsOpen, storedApiKeys, storedUserMetrics]);
+
+  useEffect(() => {
+    if (!isSettingsOpen || activeSection !== 'methodology') return;
+    void syncMethodologyFromCloud();
+  }, [isSettingsOpen, activeSection, syncMethodologyFromCloud]);
 
   useEffect(() => {
     if (!isSettingsOpen) return;
@@ -183,13 +191,23 @@ export function SettingsDrawer() {
           throw new Error(`Soubor "${file.name}" není podporovaný (.pdf, .txt, .md).`);
         }
 
-        const { fileType, content } = await readMethodologyFile(file);
-        addUploadedMethodology(createUploadedMethodology(file.name, fileType, content));
+        const document = await uploadMethodologyDocumentFile(file, storedApiKeys);
+        addUploadedMethodology(document);
       }
     } catch (error) {
       setUploadError(error instanceof Error ? error.message : 'Nahrání souboru selhalo.');
     } finally {
       setIsUploading(false);
+    }
+  };
+
+  const handleRemoveMethodology = async (docId: string) => {
+    try {
+      await deleteMethodologyDocumentRemote(docId, storedApiKeys);
+    } catch (error) {
+      console.warn('[handleRemoveMethodology] Cloud delete failed', error);
+    } finally {
+      removeUploadedMethodology(docId);
     }
   };
 
@@ -571,7 +589,7 @@ export function SettingsDrawer() {
                           </span>
                           <button
                             type="button"
-                            onClick={() => removeUploadedMethodology(doc.id)}
+                            onClick={() => void handleRemoveMethodology(doc.id)}
                             className="rounded-lg border border-slate-200 px-2 py-1 text-xs text-slate-600 hover:bg-red-50 hover:text-red-600"
                             aria-label={`Smazat ${doc.fileName}`}
                           >

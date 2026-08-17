@@ -24,6 +24,7 @@ import {
   normalizeDayData,
 } from '../lib/dayData';
 import { getTodayDate } from '../lib/dates';
+import { fetchMethodologyDocuments } from '../lib/methodology/client';
 import {
   collectLockedSessions,
   getHistorySummary,
@@ -104,7 +105,9 @@ interface TrainingActions {
   setApiKeys: (keys: Partial<ApiKeys>) => void;
   setUserMetrics: (metrics: Partial<UserMetrics>) => void;
   addUploadedMethodology: (document: UploadedMethodology) => void;
+  setUploadedMethodology: (documents: UploadedMethodology[]) => void;
   removeUploadedMethodology: (id: string) => void;
+  syncMethodologyFromCloud: () => Promise<void>;
   connectStrava: () => void;
   addCoachNote: (input: CoachNoteInput) => void;
   updateCoachNote: (id: string, updates: Partial<Pick<CoachNote, 'text' | 'category' | 'date'>>) => void;
@@ -206,10 +209,27 @@ export const useTrainingStore = create<TrainingState & TrainingActions>()(
           uploadedMethodology: [...state.uploadedMethodology, document],
         })),
 
+      setUploadedMethodology: (documents) => set({ uploadedMethodology: documents }),
+
       removeUploadedMethodology: (id) =>
         set((state) => ({
           uploadedMethodology: state.uploadedMethodology.filter((doc) => doc.id !== id),
         })),
+
+      syncMethodologyFromCloud: async () => {
+        const { apiKeys } = get();
+        try {
+          const { configured, documents, error } = await fetchMethodologyDocuments(apiKeys);
+          if (!configured) return;
+          if (error) {
+            console.warn('[syncMethodologyFromCloud]', error);
+            return;
+          }
+          set({ uploadedMethodology: documents });
+        } catch (error) {
+          console.error('[syncMethodologyFromCloud]', error);
+        }
+      },
 
       openDetailModal: (date, sessionId) =>
         set({
@@ -456,7 +476,7 @@ export const useTrainingStore = create<TrainingState & TrainingActions>()(
         }),
 
       hydrateFromCloud: (snapshot) =>
-        set({
+        set((state) => ({
           days: normalizeAllDays(snapshot.days ?? {}),
           userMetrics: {
             ...DEFAULT_USER_METRICS,
@@ -469,7 +489,10 @@ export const useTrainingStore = create<TrainingState & TrainingActions>()(
               : DEFAULT_HR_ZONES,
           },
           coachNotes: snapshot.coachNotes ?? [],
-          uploadedMethodology: snapshot.uploadedMethodology ?? [],
+          uploadedMethodology:
+            snapshot.uploadedMethodology?.length
+              ? snapshot.uploadedMethodology
+              : state.uploadedMethodology,
           apiKeys: {
             ...EMPTY_API_KEYS,
             ...snapshot.apiKeys,
@@ -477,7 +500,7 @@ export const useTrainingStore = create<TrainingState & TrainingActions>()(
           stravaConnected: snapshot.stravaConnected ?? false,
           lastStravaSyncAt: snapshot.lastStravaSyncAt ?? null,
           lastStravaActivityAt: snapshot.lastStravaActivityAt ?? null,
-        }),
+        })),
 
       setCloudSyncStatus: (status, error = null) =>
         set({ cloudSyncStatus: status, cloudSyncError: error }),

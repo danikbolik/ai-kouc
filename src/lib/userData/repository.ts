@@ -1,6 +1,6 @@
 import { normalizeAllDays } from '../dayData';
 import { EMPTY_API_KEYS } from '../apiKeyHeaders';
-import { formatSupabaseError, isMissingColumnError } from '../supabase/errors';
+import { formatSupabaseError, isMissingColumnError, isUpsertConflictError } from '../supabase/errors';
 import { getSupabaseAdmin, isCloudDbConfigured } from '../supabase/server';
 import { DEFAULT_HR_ZONES, DEFAULT_PACE_ZONES, DEFAULT_USER_METRICS } from '../../types/settings';
 import type { UserDataSnapshot } from '../../types/userData';
@@ -234,23 +234,52 @@ export async function saveUserData(
   });
 
   const upsertRow = snapshotToRow(userId, payload, shape);
-  const conflictColumn = idColumn;
 
-  const { data, error } = await supabase
-    .from('user_data')
-    .upsert(upsertRow, { onConflict: conflictColumn })
-    .select('*')
-    .single();
+  let data: Record<string, unknown> | null = null;
 
-  if (error) {
+  const tryUpsert = async () =>
+    supabase.from('user_data').upsert(upsertRow, { onConflict: idColumn }).select('*').single();
+
+  const tryUpdate = async () =>
+    supabase.from('user_data').update(upsertRow).eq(idColumn, userId).select('*').maybeSingle();
+
+  const tryInsert = async () => supabase.from('user_data').insert(upsertRow).select('*').single();
+
+  const upsertResult = await tryUpsert();
+
+  if (!upsertResult.error && upsertResult.data) {
+    data = upsertResult.data as Record<string, unknown>;
+  } else if (
+    upsertResult.error &&
+    (isUpsertConflictError(upsertResult.error) || upsertResult.error.code === '42P10')
+  ) {
+    const updateResult = await tryUpdate();
+    if (updateResult.error) {
+      throw new Error(formatSupabaseError('saveUserData UPDATE failed', updateResult.error, { userId }));
+    }
+
+    if (updateResult.data) {
+      data = updateResult.data as Record<string, unknown>;
+    } else {
+      const insertResult = await tryInsert();
+      if (insertResult.error) {
+        throw new Error(formatSupabaseError('saveUserData INSERT failed', insertResult.error, { userId }));
+      }
+      data = insertResult.data as Record<string, unknown>;
+    }
+  } else if (upsertResult.error) {
     throw new Error(
-      formatSupabaseError('saveUserData UPSERT failed', error, {
+      formatSupabaseError('saveUserData UPSERT failed', upsertResult.error, {
         userId,
         idColumn,
         blobColumn: shape.blobColumn,
         splitColumns: shape.splitColumns,
       }),
     );
+  }
+
+  if (!data) {
+    throw new Error(`saveUserData: žádná data nevrácena po uložení (userId=${userId}).`);
   }
 
   const athleteId = payload.stravaTokens?.athleteId;

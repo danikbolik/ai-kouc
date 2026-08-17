@@ -33,3 +33,11 @@ export function isMissingColumnError(error: unknown, column: string): boolean {
       message.includes('42703'))
   );
 }
+
+export function isUpsertConflictError(error: unknown): boolean {
+  if (!error || typeof error !== 'object') return false;
+  const pg = error as PostgrestError;
+  if (pg.code === '42P10') return true;
+  const message = String(pg.message ?? '').toLowerCase();
+  return message.includes('no unique or exclusion constraint') && message.includes('on conflict');
+}

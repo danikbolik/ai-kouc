@@ -187,10 +187,13 @@ export function CloudSyncProvider({ children }: { children: React.ReactNode }) {
 
         if (data && shouldPreferCloudSnapshot(data, localSlice, localUpdatedAt)) {
           hydrateCloudData(data);
-        } else if (localSlice) {
+        } else {
           const snapshot = extractPersistedSnapshot(localSlice);
           const saved = await pushCloudSnapshot(userId, snapshot);
           setLocalUpdatedAt(saved.updatedAt);
+          if (!data) {
+            console.info('[CloudSyncProvider] Cloud tabulka prázdná – lokální data odeslána do Supabase.');
+          }
         }
 
         setCloudSyncStatus('idle', null);
@@ -245,6 +248,24 @@ export function CloudSyncProvider({ children }: { children: React.ReactNode }) {
   }, [hydrateFromCloud, setCloudSyncStatus, storeHydrated]);
 
   return <>{children}</>;
+}
+
+export async function pushLocalDataToCloud(): Promise<{ success: boolean; error?: string }> {
+  const userId = getOrCreateUserId();
+  useTrainingStore.getState().setCloudSyncStatus('syncing', null);
+
+  try {
+    const snapshot = extractPersistedSnapshot(pickPersistedSlice(useTrainingStore.getState()));
+    const saved = await pushCloudSnapshot(userId, snapshot);
+    setLocalUpdatedAt(saved.updatedAt);
+    await useTrainingStore.getState().syncMethodologyFromCloud();
+    useTrainingStore.getState().setCloudSyncStatus('idle', null);
+    return { success: true };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Odeslání do cloudu selhalo.';
+    useTrainingStore.getState().setCloudSyncStatus('error', message);
+    return { success: false, error: message };
+  }
 }
 
 export async function linkCloudAccountAndHydrate(

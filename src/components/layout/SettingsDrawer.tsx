@@ -9,7 +9,7 @@ import {
   deleteMethodologyDocumentRemote,
   uploadMethodologyDocumentFile,
 } from '../../lib/methodology/client';
-import { linkCloudAccountAndHydrate } from '../providers/CloudSyncProvider';
+import { linkCloudAccountAndHydrate, pushLocalDataToCloud } from '../providers/CloudSyncProvider';
 import { getOrCreateUserId, isValidUserIdFormat } from '../../lib/userId';
 import {
   DEFAULT_HR_ZONES,
@@ -88,6 +88,8 @@ export function SettingsDrawer() {
   const stravaConnected = useTrainingStore((s) => s.stravaConnected);
   const [linkTargetId, setLinkTargetId] = useState('');
   const [linkFeedback, setLinkFeedback] = useState<string | null>(null);
+  const [isPushingCloud, setIsPushingCloud] = useState(false);
+  const [pushCloudFeedback, setPushCloudFeedback] = useState<string | null>(null);
   const [isLinking, setIsLinking] = useState(false);
 
   useEffect(() => {
@@ -135,6 +137,21 @@ export function SettingsDrawer() {
     });
     setSaveFeedback('OpenAI klíč uložen a synchronizuje se do cloudu.');
     setTimeout(() => setSaveFeedback(null), 3000);
+  };
+
+  const handlePushToCloud = async () => {
+    setIsPushingCloud(true);
+    setPushCloudFeedback(null);
+    try {
+      const result = await pushLocalDataToCloud();
+      setPushCloudFeedback(
+        result.success
+          ? 'Data odeslána do Supabase. V Table Editoru by se měl objevit 1 řádek s tvým Cloud ID.'
+          : (result.error ?? 'Odeslání selhalo.'),
+      );
+    } finally {
+      setIsPushingCloud(false);
+    }
   };
 
   const handleLinkCloudAccount = async () => {
@@ -631,6 +648,30 @@ export function SettingsDrawer() {
                       Sync chyba: {cloudSyncError}
                     </p>
                   )}
+
+                  <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3">
+                    <p className="text-[11px] text-amber-900">
+                      Prázdná tabulka v Supabase je normální při prvním spuštění. Na PC klikni níže
+                      a odešli lokální data do cloudu. Pak Cloud ID zkopíruj na mobil.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => void handlePushToCloud()}
+                      disabled={isPushingCloud}
+                      className="mt-2 w-full rounded-lg bg-amber-600 px-3 py-2 text-xs font-semibold text-white hover:bg-amber-700 disabled:opacity-50"
+                    >
+                      {isPushingCloud ? 'Odesílám…' : 'Odeslat data do cloudu (PC → Supabase)'}
+                    </button>
+                    {pushCloudFeedback && (
+                      <p
+                        className={`mt-2 text-[11px] font-medium ${
+                          pushCloudFeedback.includes('selhalo') ? 'text-red-700' : 'text-emerald-700'
+                        }`}
+                      >
+                        {pushCloudFeedback}
+                      </p>
+                    )}
+                  </div>
 
                   <div className="mt-3 space-y-2 rounded-xl border border-slate-200 bg-white p-3">
                     <p className="text-xs font-semibold text-slate-800">Synchronizace mezi zařízeními</p>

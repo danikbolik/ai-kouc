@@ -1,3 +1,4 @@
+import { COACH_FATIGUE_MODIFICATION_PROTOCOL, COACH_MICROCYCLE_RULES } from './coachCalibration';
 import { getDaysUntilDate, getTodayDate, getTrainingPhaseLabel, parseDate } from './dates';
 import type { UserMetrics } from '../types/settings';
 import {
@@ -59,6 +60,10 @@ export function buildEnhancedAthleteProfile(userMetrics: UserMetrics): string {
       : null;
 
   return [
+    '## Profil sportovce – výkonnostní semi-pro vytrvalec / OB běžec',
+    'Týdenní objemy typicky 70–100 km. Zvyklý na Double Threshold, laktátové testování, vysokou toleranci zátěže.',
+    'Trénuje kvalitně i při mírné únavě (TSB -15 až +5) – NE amatérská opatrnost.',
+    '',
     `HRmax: ${userMetrics.HRmax} bpm`,
     userMetrics.AeT !== undefined ? `Aerobní práh (AeT): ${userMetrics.AeT} bpm` : null,
     `Anaerobní práh (ANP/LT): ${userMetrics.ANP} bpm`,
@@ -75,6 +80,10 @@ export function buildEnhancedAthleteProfile(userMetrics: UserMetrics): string {
       ? `Vzdálenost závodu: ${userMetrics.raceDistanceKm} km`
       : null,
     `Aktuální tréninková fáze/blok: ${getTrainingPhaseLabel(today)}`,
+    '',
+    COACH_FATIGUE_MODIFICATION_PROTOCOL,
+    '',
+    COACH_MICROCYCLE_RULES,
   ]
     .filter((line) => line !== null && line !== '')
     .join('\n');

@@ -13,50 +13,43 @@ function isLocked(session: WorkoutSession, lockedIds: Set<string>): boolean {
   return session.isLocked || lockedIds.has(session.id);
 }
 
-function createRestSession(date: string, phase: WorkoutSession['phase']): WorkoutSession {
-  return {
-    id: `${date}-${phase}-regen`,
-    phase,
-    title: 'Regenerační den – AI adaptace',
-    type: 'rest',
-    isLocked: false,
-    planned: {
-      description:
-        'Adaptace plánu kvůli vysoké únavě (readiness ≥ 8). Kompletní odpočinek, hydratace, lehká procházka max 20 min.',
-    },
-  };
-}
-
-function createMobilitySession(date: string, phase: WorkoutSession['phase']): WorkoutSession {
-  return {
-    id: `${date}-${phase}-mobility`,
-    phase,
-    title: 'Regenerační mobilita – AI adaptace',
-    type: 'mobility',
-    isLocked: false,
-    planned: {
-      description:
-        'Lehká mobilita a strečink 30–45 min. Bez aerobní zátěže – kyčle, hamstringy, lýtka.',
-    },
-  };
-}
-
-function downgradeSession(session: WorkoutSession, date: string): WorkoutSession {
+/** Modifikace těžké jednotky místo zrušení – pro readiness ≥ 8 */
+function modifyHeavySessionForFatigue(session: WorkoutSession, date: string): WorkoutSession {
   return {
     ...session,
-    id: `${session.id}-adapted`,
-    title: `${session.title} (posunuto – AI adaptace)`,
+    id: `${session.id}-fatigue-mod`,
+    title: `${session.title} (úprava – mírná únava)`,
     planned: {
       ...session.planned,
-      description: `[Posunuto z ${date}] ${session.planned.description}`,
+      description: [
+        `[Úprava kvůli readiness ≥8 – ${date}]`,
+        'Běhej na pocit/laktát (~4 mmol/l). Zkrácení objemu ~25 %, delší pauzy (+15 s).',
+        'Pokud po 4. opakování neudržíš tempo, ukonči předčasně.',
+        session.planned.description,
+      ].join(' '),
+    },
+  };
+}
+
+function createEasyRunSession(date: string, phase: WorkoutSession['phase']): WorkoutSession {
+  return {
+    id: `${date}-${phase}-easy`,
+    phase,
+    title: 'Lehký regenerační klus – AI adaptace',
+    type: 'klus',
+    isLocked: false,
+    planned: {
+      description:
+        '8–10 km v Z1–Z2 (autoregulace). Místo zrušení kvalitní jednotky – 1 lehký den v týdnu.',
+      distanceKm: 9,
+      targetPace: '5:30',
     },
   };
 }
 
 /**
- * Simuluje structured output LLM adaptaci plánu.
- * Při readinessScore >= 8: 2 dny regenerace, těžké jednotky posunuty na později.
- * Respektuje isLocked session.
+ * Adaptace plánu při vysoké únavě (readiness ≥ 8).
+ * Modifikuje těžké jednotky místo 2 dnů kompletního volna.
  */
 export function adaptTrainingPlan(request: RecalculateRequest): RecalculateResponse {
   const lockedIds = new Set(request.lockedSessions.map((s) => s.id));
@@ -70,89 +63,55 @@ export function adaptTrainingPlan(request: RecalculateRequest): RecalculateRespo
     return { updatedDays };
   }
 
-  const deferredHeavy: WorkoutSession[] = [];
+  let easyDayUsed = false;
 
-  // Fáze 1: nejbližší 2 dny → regenerace (kromě zamčených session)
   for (let i = 0; i < Math.min(2, futureDates.length); i++) {
     const date = futureDates[i];
     const day = request.currentDays[date];
     if (!day) continue;
 
+    const sessions = daySessions(day);
     const newSessions: WorkoutSession[] = [];
+    let dayModified = false;
 
-    for (const session of daySessions(day)) {
+    for (const session of sessions) {
       if (isLocked(session, lockedIds)) {
         newSessions.push(session);
         continue;
       }
 
       if (HEAVY_TYPES.includes(session.type)) {
-        deferredHeavy.push(downgradeSession(session, date));
+        newSessions.push(modifyHeavySessionForFatigue(session, date));
+        dayModified = true;
         continue;
       }
 
-      if (session.type === 'rest' || session.type === 'mobility') {
-        newSessions.push(session);
-      }
+      newSessions.push(session);
     }
 
-    if (newSessions.filter((s) => !isLocked(s, lockedIds)).length === 0) {
-      newSessions.unshift(
-        i === 0 ? createRestSession(date, 'AM') : createMobilitySession(date, 'AM'),
-      );
-    } else {
-      const hasRegen = newSessions.some((s) => s.type === 'rest' || s.type === 'mobility');
-      if (!hasRegen) {
-        newSessions.push(i === 0 ? createRestSession(date, 'PM') : createMobilitySession(date, 'PM'));
-      }
+    if (dayModified) {
+      updatedDays[date] = legacySessionsToDay(date, newSessions, day.feedback);
     }
-
-    updatedDays[date] = legacySessionsToDay(date, newSessions, day.feedback);
   }
 
-  // Fáze 2: posuň odložené těžké jednotky na volné sloty po regeneraci
-  if (deferredHeavy.length > 0) {
-    const slotsAfterRegen = futureDates.slice(2);
-    let deferredIndex = 0;
-
-    for (const date of slotsAfterRegen) {
-      if (deferredIndex >= deferredHeavy.length) break;
-
-      const day = updatedDays[date] ?? request.currentDays[date];
-      if (!day) continue;
-
+  const nextDate = futureDates[2];
+  if (!easyDayUsed && nextDate && request.readinessScore >= 9) {
+    const day = request.currentDays[nextDate];
+    if (day) {
       const sessions = daySessions(day);
       const hasHeavy = sessions.some(
-        (s) => HEAVY_TYPES.includes(s.type) && isLocked(s, lockedIds),
-      );
-      if (hasHeavy) continue;
-
-      const hasUnlockedHeavy = sessions.some(
         (s) => HEAVY_TYPES.includes(s.type) && !isLocked(s, lockedIds),
       );
-
-      if (!hasUnlockedHeavy) {
-        const deferred = deferredHeavy[deferredIndex];
-        const rescheduled: WorkoutSession = {
-          ...deferred,
-          id: `${date}-${deferred.phase}-rescheduled`,
-          phase: sessions[0]?.phase ?? 'PM',
-          title: deferred.title.replace('(posunuto – AI adaptace)', '(přeplánováno)'),
-          planned: {
-            ...deferred.planned,
-            description: `Přeplánováno kvůli vysoké únavě. ${deferred.planned.description}`,
-          },
-        };
-
-        updatedDays[date] = legacySessionsToDay(
-          date,
-          [
-            ...sessions.filter((s) => isLocked(s, lockedIds) || !HEAVY_TYPES.includes(s.type)),
-            rescheduled,
-          ],
+      if (hasHeavy) {
+        const filtered = sessions.filter(
+          (s) => isLocked(s, lockedIds) || !HEAVY_TYPES.includes(s.type),
+        );
+        updatedDays[nextDate] = legacySessionsToDay(
+          nextDate,
+          [...filtered, createEasyRunSession(nextDate, 'AM')],
           day.feedback,
         );
-        deferredIndex++;
+        easyDayUsed = true;
       }
     }
   }
@@ -198,7 +157,6 @@ export function getHistorySummary(
   }).filter((d): d is DayData => d !== undefined);
 }
 
-/** Připraví kontext pro LLM volání (použitelné s OpenAI structured outputs) */
 export function buildRecalculatePromptContext(request: RecalculateRequest): string {
   return JSON.stringify(
     {
@@ -208,7 +166,10 @@ export function buildRecalculatePromptContext(request: RecalculateRequest): stri
       userMetrics: request.userMetrics,
       historyDays: request.historySummary.length,
       futureDays: Object.keys(request.currentDays).length,
-      rule: request.readinessScore >= 8 ? 'APPLY_REGENERATION_PROTOCOL' : 'NO_CHANGE',
+      rule:
+        request.readinessScore >= 8
+          ? 'APPLY_FATIGUE_MODIFICATION_PROTOCOL'
+          : 'NO_CHANGE',
     },
     null,
     2,

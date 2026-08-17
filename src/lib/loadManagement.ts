@@ -1,5 +1,6 @@
-import { addDaysToDate, formatDateKey, getTodayDate, parseDate } from './dates';
+import { buildLoadManagementCoachRules } from './coachCalibration';
 import { getActivities, normalizeDayData } from './dayData';
+import { addDaysToDate, formatDateKey, getTodayDate, parseDate } from './dates';
 import type { Activity, DayData } from '../types/training';
 import type { UserMetrics } from '../types/settings';
 
@@ -260,13 +261,17 @@ export function buildLoadManagementContext(
 ): string {
   const metrics = computeLoadMetrics(days, userMetrics);
   const tsbStatus =
-    metrics.tsb < -25
-      ? '🔴 HLUBOKÁ ÚNAVA (TSB < -25) – prioritně regenerace'
-      : metrics.tsb < -10
-        ? '🟠 Únava (TSB -10 až -25) – opatrně s intenzitou'
-        : metrics.tsb > 10
-          ? '🟢 Fresh forma (TSB > +10) – vhodné pro kvalitní trénink/závod'
-          : '🟡 Vyvážená zátěž (TSB -10 až +10)';
+    metrics.tsb < -35
+      ? '🔴 Akutní přetížení (TSB < -35) – regenerace, max 1–2 lehké dny'
+      : metrics.tsb < -25
+        ? '🟠 Hluboká únava (TSB -25 až -35) – prioritizuj lehký den, zachovej strukturu týdne'
+        : metrics.tsb < -15
+          ? '🟡 Functional overreaching (TSB -15 až -25) – kvalitu MODIFIKUJ, ne ruš'
+          : metrics.tsb < -5
+            ? '🟢 Optimální tréninková zóna (TSB -5 až -15) – kvalita OK s autoregulací'
+            : metrics.tsb > 10
+              ? '🟢 Fresh forma (TSB > +10) – vhodné pro závod / max kvalitu'
+              : '✅ Vyvážená zátěž (TSB -5 až +10) – plán drž';
 
   return `## TSS / CTL / ATL / TSB (Load Management)
 
@@ -275,9 +280,7 @@ export function buildLoadManagementContext(
 - **TSB** (Training Stress Balance / forma): **${metrics.tsb}** – ${tsbStatus}
 - TSS dnes: ${metrics.todayTss} | TSS posledních 7 dní: ${metrics.last7dTss}
 
-PŘÍKAZ PRO AI:
-- Pracuj s metodikou CTL/ATL/TSB a TSS – ne jen s km
-- TSB < -25: nekompromisně nařiď regeneraci bez ohledu na plán
+${buildLoadManagementCoachRules(metrics)}
 - U OB a krosu ignoruj ploché tempo – hodnot intenzitu podle TF, zón, +m a TSS
 - U vícedenních OB etap hlídej glykogen a TSB mezi etapami`;
 }

@@ -354,11 +354,12 @@ ${remainingLines.length > 0 ? remainingLines.join('\n') : 'Žádné plánované 
 - ${backToBackRisk}
 
 ### PŘÍKAZ PRO AI – mikrocyklus
-1. Při JAKÉKOLI úpravě jednoho dne (rychlost, objem, únava, preference) vyhodnoť dopad na VŠECHNY zbývající dny tohoto týdne.
-2. Pokud úprava zvýší zátěž (např. zachování intervalů), AUTOMATICKY navrhni kompenzaci: snížení intenzity, zrušení druhé fáze, volný den, Z1 regenerace.
-3. V update_calendar_workouts pošli VŠECHNY dotčené dny NAJEDNOU – id existujícího tréninku vyplň pro update, pro smazání použij delete_planned_workouts.
-4. V odpovědi uveď **Přehled upraveného harmonogramu do konce týdne** – den po dni s vysvětlením souvislostí.
-5. Příklad tónu: „Rozumím, chceš zachovat rychlost. Zkrátil jsem intervaly na 10×500 m. Aby ses nepřetížil před víkendem, upravil jsem zbytek týdne: sobota – zrušena druhá fáze, neděle – snížena TF na Z1."`;
+1. Při JAKÉKOLI úpravě jednoho dne vyhodnoť dopad na VŠECHNY zbývající dny tohoto týdne.
+2. Pokud úprava zvýší zátěž, kompenzuj CÍLENĚ: 1 lehčí den (Z1), zkrácení objemu – NE 3+ dny volna.
+3. V update_calendar_workouts pošli VŠECHNY dotčené dny NAJEDNOU.
+4. V odpovědi uveď **Přehled upraveného harmonogramu do konce týdne** – den po dni.
+5. Příklad tónu: „Zkrátil jsem intervaly na 12×300 m s pauzou 60 s. Sobota – long run 18 km Z2, neděle – volno."
+6. Zachovej strukturu týdne: Po kvalita, Út objem, St prah, Čt klus, Pá doplňkový, So/Ne long/kvalita.`;
 }
 
 function computeWeeklyKm(runs: RunRecord[], weekDates: string[]): number {

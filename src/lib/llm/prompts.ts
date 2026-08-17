@@ -1,3 +1,4 @@
+import { COACH_FATIGUE_MODIFICATION_PROTOCOL, COACH_MICROCYCLE_RULES } from '@/lib/coachCalibration';
 import { buildEnhancedAthleteProfile, buildMultiStageRaceWeekendRules } from '@/lib/athleteProfileContext';
 import { buildIntervalDescription } from '@/lib/intervalBuilder';
 import { WORKOUT_PLAN_CHAT_FORMAT_EXAMPLE } from '@/lib/workoutPlanChatFormat';
@@ -169,10 +170,14 @@ ${futurePlan}
 
 ## Instrukce pro výstup
 1. Používej POUZE pravidla z metodického RAG kontextu výše.
-2. Pokud readinessScore >= 8: nejbližší 2 dny od ${request.fromDate} = regenerace (rest/mobility) dle metodiky.
+2. Pokud readinessScore >= 8: NERUŠ kvalitní tréninky na volno. Modifikuj nejbližší těžké jednotky (zkrácení sérií ~20–30 %, delší pauzy, autoregulace dle pocitu/laktátu). Max 1 lehčí den (Z1 klus), NE 2 dny regenerace.
 3. isLocked: true session vrať beze změny.
 4. Ke každému novému/upravenému tréninku vyplň bookReference (bookTitle, chapterOrPage, quote) z RAG kontextu, pokud je k dispozici – pole je volitelné.
 5. Vrať POUZE objekt { "updatedDays": { ... } } – klíč updatedDays je povinný, každý den musí mít date shodné s klíčem záznamu.
+
+${COACH_FATIGUE_MODIFICATION_PROTOCOL}
+
+${COACH_MICROCYCLE_RULES}
 `.trim();
 }
 
@@ -207,10 +212,12 @@ d) **Verdikt** – jasné hodnocení (vhodná / riziková / nevhodná pro fázi)
     parts.push(`### POVINNÝ FORMÁT PŘI ÚPRAVĚ PLÁNU – TÝDENNÍ MIKROCYKLUS
 Neodpovídej suchým „Provedl jsem úpravy". Struktura odpovědi:
 1. **Reakce na požadavek sportovce** – co chce a jak to ovlivní zátěž týdne
-2. **Úprava požadovaného dne** – konkrétní změna (např. zkrácení intervalů)
-3. **Kompenzace navazujících dnů** – co měníš v sobotě/neděli/atd. a proč (acidóza, glykogen, back-to-back)
-4. **Přehled upraveného harmonogramu do konce týdne** – každý den ve formátu 📅 / Parametry / Odůvodnění trenéra (viz příklad níže)
-5. V update_calendar_workouts pošli VŠECHNY dotčené dny najednou s vyplněným coachReasoning; pro smazání použij delete_planned_workouts
+2. **Úprava požadovaného dne** – MODIFIKACE (pauzy, objem, tempo), NE automatické zrušení kvality
+3. **Kompenzace navazujících dnů** – max 1 lehčí den, NE vyprázdnění týdne volnem
+4. **Přehled upraveného harmonogramu do konce týdne** – každý den ve formátu 📅 / Parametry / Odůvodnění trenéra
+5. V update_calendar_workouts pošli VŠECHNY dotčené dny najednou s vyplněným coachReasoning
+
+${COACH_FATIGUE_MODIFICATION_PROTOCOL}
 
 Příklad povinného formátu výstupu v chatu:
 ${WORKOUT_PLAN_CHAT_FORMAT_EXAMPLE}`);
@@ -306,8 +313,8 @@ ${calendarContext}
 3. Hodnoť trénink v kontextu AKTUÁLNÍ FÁZE makrocyklu (zimní báze ≠ taper ≠ objemový blok).
 4. Porovnej nadcházející plán s dlouhodobou historií i s přesným přehledem posledních odbehaných běhů ze Stravy – cituj konkrétní dny („Ve středu jsi běžel…").
 5. Explicitně zohledni odjeté dny tohoto týdne (sekce aktuální týden) při analýze zbytku týdne.
-6. Pokud detekuješ chybu, varuj ostře, edukuj a vysvětli fyziologické riziko – ne jen „to není ideální".
-7. Při korekci plánu: vyhodnoť dopad na CELÝ mikrocyklus; pošli všechny změny v update_calendar_workouts (+ delete_planned_workouts).
+6. Pokud detekuješ chybu, varuj věcně s daty – navrhni MODIFIKACI, ne automatické volno při mírné únavě.
+7. Při korekci plánu: vyhodnoť dopad na CELÝ mikrocyklus; zachovej strukturu týdne (max 1 volno).
 8. Po zápisu plánu ukaž v chatu každý trénink: 📅 Datum – název | **Parametry** | **Odůvodnění trenéra** (vyplň coachReasoning v tool call).
 9. V odpovědi vždy uveď **Přehled upraveného harmonogramu do konce týdne** – den po dni.
 10. U intervalů, tempa a závodů vyplň warmUp/coolDown; u závodů raceDetails.

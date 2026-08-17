@@ -22,14 +22,22 @@ export async function POST(request: Request) {
 
   if (!isValidUserId(deviceUserId)) {
     return NextResponse.json(
-      { error: 'Chybí nebo je neplatné X-User-Id hlavička.' },
+      {
+        error: 'Chybí nebo je neplatné X-User-Id hlavička.',
+        code: 'INVALID_DEVICE_CLOUD_ID',
+      },
       { status: 400 },
     );
   }
 
   if (!isCloudDbConfigured()) {
     return NextResponse.json(
-      { configured: false, error: 'Cloud databáze není nakonfigurována.' },
+      {
+        configured: false,
+        error:
+          'Cloud databáze není nakonfigurována. Nastav SUPABASE_URL a SUPABASE_SERVICE_ROLE_KEY na serveru.',
+        code: 'CLOUD_NOT_CONFIGURED',
+      },
       { status: 503 },
     );
   }
@@ -41,7 +49,7 @@ export async function POST(request: Request) {
       const targetUserId = body.targetUserId?.trim();
       if (!isValidUserId(targetUserId)) {
         return NextResponse.json(
-          { error: 'Neplatné cílové Cloud ID.' },
+          { error: 'Neplatné cílové Cloud ID (očekáván UUID).', code: 'INVALID_TARGET_CLOUD_ID' },
           { status: 400 },
         );
       }
@@ -60,7 +68,10 @@ export async function POST(request: Request) {
 
     if (!athleteId) {
       return NextResponse.json(
-        { error: 'Strava účet není propojen – nelze synchronizovat napříč zařízeními.' },
+        {
+          error: 'Strava účet není propojen – nelze synchronizovat napříč zařízeními.',
+          code: 'STRAVA_NOT_LINKED',
+        },
         { status: 400 },
       );
     }
@@ -73,9 +84,18 @@ export async function POST(request: Request) {
       data: result.data,
     });
   } catch (error) {
-    console.error('[API /user-data/link-account POST]', error);
-    const detail =
-      error instanceof Error ? error.message : 'Propojení účtu selhalo.';
-    return NextResponse.json({ error: detail }, { status: 500 });
+    const detail = error instanceof Error ? error.message : 'Propojení účtu selhalo.';
+    console.error('[API /user-data/link-account POST]', {
+      deviceUserId,
+      error,
+      detail,
+    });
+    return NextResponse.json(
+      {
+        error: detail,
+        code: 'LINK_ACCOUNT_FAILED',
+      },
+      { status: 500 },
+    );
   }
 }

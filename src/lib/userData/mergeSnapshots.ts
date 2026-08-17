@@ -138,12 +138,21 @@ export function mergeUserDataSnapshots(
 
 export function cloudHasSettingsLocalMissing(
   cloud: UserDataSnapshot,
-  local: Pick<UserDataSnapshot, 'userMetrics' | 'coachNotes' | 'uploadedMethodology'>,
+  local: Pick<UserDataSnapshot, 'userMetrics' | 'coachNotes' | 'uploadedMethodology' | 'apiKeys'>,
 ): boolean {
-  if (!hasMeaningfulSettingsData(cloud)) return false;
+  if (!hasMeaningfulSettingsData(cloud)) {
+    const cloudHasApiKey = Boolean(cloud.apiKeys?.openaiApiKey?.trim());
+    const localHasApiKey = Boolean(local.apiKeys?.openaiApiKey?.trim());
+    if (cloudHasApiKey && !localHasApiKey) return true;
+    return false;
+  }
 
   const localHasSettings = hasMeaningfulSettingsData(local);
   if (!localHasSettings) return true;
+
+  const cloudHasApiKey = Boolean(cloud.apiKeys?.openaiApiKey?.trim());
+  const localHasApiKey = Boolean(local.apiKeys?.openaiApiKey?.trim());
+  if (cloudHasApiKey && !localHasApiKey) return true;
 
   if (cloud.coachNotes.length > local.coachNotes.length) return true;
   if (cloud.uploadedMethodology.length > local.uploadedMethodology.length) return true;

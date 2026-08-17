@@ -1,5 +1,6 @@
 import { normalizeAllDays } from '../dayData';
 import { EMPTY_API_KEYS } from '../apiKeyHeaders';
+import { formatSupabaseError, isMissingColumnError } from '../supabase/errors';
 import { getSupabaseAdmin, isCloudDbConfigured } from '../supabase/server';
 import { DEFAULT_HR_ZONES, DEFAULT_PACE_ZONES, DEFAULT_USER_METRICS } from '../../types/settings';
 import type { UserDataSnapshot } from '../../types/userData';
@@ -48,14 +49,12 @@ export async function getUserData(userId: string): Promise<UserDataSnapshot | nu
 
   const { data, error } = await supabase
     .from('user_data')
-    .select('payload, updated_at, strava_athlete_id')
+    .select('payload, updated_at')
     .eq('user_id', userId)
     .maybeSingle();
 
   if (error) {
-    const detail = error.message ?? error.code ?? JSON.stringify(error);
-    console.error('[userDataRepository.getUserData]', { userId, detail, error });
-    throw new Error(`Nepodařilo se načíst data z cloudu: ${detail}`);
+    throw new Error(formatSupabaseError('getUserData SELECT failed', error, { userId }));
   }
 
   if (!data) return null;
@@ -67,36 +66,46 @@ export async function getUserData(userId: string): Promise<UserDataSnapshot | nu
   });
 }
 
-/** Najde existující cloud účet podle Strava athlete ID (sloupec nebo JSONB fallback). */
-export async function findUserIdByStravaAthleteId(
+async function findUserIdByStravaAthleteIdColumn(
   athleteId: number,
   excludeUserId?: string,
 ): Promise<string | null> {
   const supabase = getSupabaseAdmin();
   if (!supabase) return null;
 
-  let columnQuery = supabase
-    .from('user_data')
-    .select('user_id')
-    .eq('strava_athlete_id', athleteId);
+  let query = supabase.from('user_data').select('user_id').eq('strava_athlete_id', athleteId);
 
   if (excludeUserId) {
-    columnQuery = columnQuery.neq('user_id', excludeUserId);
+    query = query.neq('user_id', excludeUserId);
   }
 
-  const { data: byColumn, error: columnError } = await columnQuery.maybeSingle();
+  const { data, error } = await query.maybeSingle();
 
-  if (!columnError && byColumn?.user_id) {
-    return byColumn.user_id as string;
+  if (error) {
+    if (isMissingColumnError(error, 'strava_athlete_id')) {
+      return null;
+    }
+    console.warn('[findUserIdByStravaAthleteIdColumn]', formatSupabaseError('column lookup', error));
+    return null;
   }
 
-  const { data: rows, error: jsonError } = await supabase
+  return (data?.user_id as string | undefined) ?? null;
+}
+
+async function findUserIdByStravaAthleteIdPayload(
+  athleteId: number,
+  excludeUserId?: string,
+): Promise<string | null> {
+  const supabase = getSupabaseAdmin();
+  if (!supabase) return null;
+
+  const { data: rows, error } = await supabase
     .from('user_data')
     .select('user_id, payload')
     .not('payload', 'is', null);
 
-  if (jsonError) {
-    console.warn('[findUserIdByStravaAthleteId]', jsonError);
+  if (error) {
+    console.warn('[findUserIdByStravaAthleteIdPayload]', formatSupabaseError('payload scan', error));
     return null;
   }
 
@@ -111,6 +120,16 @@ export async function findUserIdByStravaAthleteId(
   return null;
 }
 
+/** Najde existující cloud účet podle Strava athlete ID. */
+export async function findUserIdByStravaAthleteId(
+  athleteId: number,
+  excludeUserId?: string,
+): Promise<string | null> {
+  const byColumn = await findUserIdByStravaAthleteIdColumn(athleteId, excludeUserId);
+  if (byColumn) return byColumn;
+  return findUserIdByStravaAthleteIdPayload(athleteId, excludeUserId);
+}
+
 export async function linkStravaAthleteId(userId: string, athleteId: number): Promise<void> {
   const supabase = getSupabaseAdmin();
   if (!supabase) return;
@@ -120,8 +139,8 @@ export async function linkStravaAthleteId(userId: string, athleteId: number): Pr
     .update({ strava_athlete_id: athleteId })
     .eq('user_id', userId);
 
-  if (error) {
-    console.warn('[linkStravaAthleteId] Column update failed (may need migration):', error.message);
+  if (error && !isMissingColumnError(error, 'strava_athlete_id')) {
+    console.warn('[linkStravaAthleteId]', formatSupabaseError('UPDATE strava_athlete_id', error, { userId }));
   }
 }
 
@@ -131,17 +150,14 @@ export async function saveUserData(
 ): Promise<UserDataSnapshot> {
   const supabase = getSupabaseAdmin();
   if (!supabase) {
-    throw new Error('Cloud databáze není nakonfigurována.');
+    throw new Error('Cloud databáze není nakonfigurována (SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY).');
   }
 
   let existing: UserDataSnapshot | null = null;
   try {
     existing = await getUserData(userId);
   } catch (error) {
-    console.warn('[userDataRepository.saveUserData] Existing row load failed, upserting snapshot', {
-      userId,
-      error,
-    });
+    console.warn('[saveUserData] Existing row load failed, upserting snapshot', { userId, error });
   }
 
   const payload: UserDataSnapshot = normalizeSnapshot({
@@ -153,52 +169,25 @@ export async function saveUserData(
     updatedAt: new Date().toISOString(),
   });
 
-  const upsertRow: Record<string, unknown> = {
+  const upsertBase = {
     user_id: userId,
     payload,
     updated_at: payload.updatedAt,
   };
 
-  const athleteId = payload.stravaTokens?.athleteId;
-  if (athleteId) {
-    upsertRow.strava_athlete_id = athleteId;
-  }
-
   const { data, error } = await supabase
     .from('user_data')
-    .upsert(upsertRow, { onConflict: 'user_id' })
+    .upsert(upsertBase, { onConflict: 'user_id' })
     .select('payload, updated_at')
     .single();
 
   if (error) {
-    if (athleteId && error.message?.includes('strava_athlete_id')) {
-      const { data: fallbackData, error: fallbackError } = await supabase
-        .from('user_data')
-        .upsert(
-          {
-            user_id: userId,
-            payload,
-            updated_at: payload.updatedAt,
-          },
-          { onConflict: 'user_id' },
-        )
-        .select('payload, updated_at')
-        .single();
+    throw new Error(formatSupabaseError('saveUserData UPSERT failed', error, { userId }));
+  }
 
-      if (fallbackError) {
-        throw new Error(`Nepodařilo se uložit data do cloudu: ${fallbackError.message}`);
-      }
-
-      const savedPayload = (fallbackData.payload ?? {}) as Partial<UserDataSnapshot>;
-      return normalizeSnapshot({
-        ...savedPayload,
-        updatedAt: fallbackData.updated_at ?? savedPayload.updatedAt,
-      });
-    }
-
-    const detail = error.message ?? error.code ?? JSON.stringify(error);
-    console.error('[userDataRepository.saveUserData]', { userId, detail, error });
-    throw new Error(`Nepodařilo se uložit data do cloudu: ${detail}`);
+  const athleteId = payload.stravaTokens?.athleteId;
+  if (athleteId) {
+    await linkStravaAthleteId(userId, athleteId);
   }
 
   const savedPayload = (data.payload ?? {}) as Partial<UserDataSnapshot>;
@@ -226,10 +215,6 @@ export async function saveStravaTokensForUser(
     stravaConnected: true,
     stravaTokens: tokens,
   });
-
-  if (tokens.athleteId) {
-    await linkStravaAthleteId(userId, tokens.athleteId);
-  }
 }
 
 export { isCloudDbConfigured, normalizeSnapshot };

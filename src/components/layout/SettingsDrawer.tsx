@@ -81,6 +81,7 @@ export function SettingsDrawer() {
   const [isUploading, setIsUploading] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
   const cloudSyncStatus = useTrainingStore((s) => s.cloudSyncStatus);
+  const cloudSyncError = useTrainingStore((s) => s.cloudSyncError);
   const stravaConnected = useTrainingStore((s) => s.stravaConnected);
   const [linkTargetId, setLinkTargetId] = useState('');
   const [linkFeedback, setLinkFeedback] = useState<string | null>(null);
@@ -138,12 +139,16 @@ export function SettingsDrawer() {
     setIsLinking(true);
     setLinkFeedback(null);
     try {
-      const ok = await linkCloudAccountAndHydrate(target);
-      setLinkFeedback(
-        ok
-          ? 'Účet propojen – parametry, paměť trenéra a metodika načteny z cloudu.'
-          : 'Propojení selhalo – zkontroluj Cloud ID a připojení k Supabase.',
-      );
+      const result = await linkCloudAccountAndHydrate(target);
+      if (result.success) {
+        const syncedKey = useTrainingStore.getState().apiKeys.openaiApiKey;
+        if (syncedKey) setOpenaiApiKey(syncedKey);
+        setLinkFeedback(
+          'Účet propojen – parametry, paměť trenéra, metodika i OpenAI klíč načteny z cloudu.',
+        );
+      } else {
+        setLinkFeedback(result.error ?? 'Propojení selhalo – zkontroluj Cloud ID a Supabase.');
+      }
     } finally {
       setIsLinking(false);
     }
@@ -603,6 +608,11 @@ export function SettingsDrawer() {
                       <span className="ml-2 text-slate-500">· sync: {cloudSyncStatus}</span>
                     )}
                   </p>
+                  {cloudSyncError && (
+                    <p className="mt-2 rounded-lg bg-red-50 px-3 py-2 text-[10px] text-red-700">
+                      Sync chyba: {cloudSyncError}
+                    </p>
+                  )}
 
                   <div className="mt-3 space-y-2 rounded-xl border border-slate-200 bg-white p-3">
                     <p className="text-xs font-semibold text-slate-800">Synchronizace mezi zařízeními</p>
@@ -634,7 +644,15 @@ export function SettingsDrawer() {
                       {isLinking ? 'Propojuji…' : 'Propojit s cloud účtem'}
                     </button>
                     {linkFeedback && (
-                      <p className="text-[11px] font-medium text-emerald-700">{linkFeedback}</p>
+                      <p
+                        className={`text-[11px] font-medium ${
+                          linkFeedback.includes('selhalo') || linkFeedback.includes('Neplatné')
+                            ? 'text-red-700'
+                            : 'text-emerald-700'
+                        }`}
+                      >
+                        {linkFeedback}
+                      </p>
                     )}
                   </div>
                 </div>

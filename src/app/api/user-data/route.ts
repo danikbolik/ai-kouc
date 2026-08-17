@@ -51,10 +51,13 @@ export async function GET(request: Request) {
       canonicalUserId: canonicalUserId !== userId ? canonicalUserId : undefined,
     });
   } catch (error) {
-    console.error('[API /user-data GET]', error);
+    console.error('[API /user-data GET]', { userId, error });
     const detail =
       error instanceof Error ? error.message : 'Nepodařilo se načíst cloud data.';
-    return NextResponse.json({ error: detail }, { status: 500 });
+    return NextResponse.json(
+      { error: detail, code: 'CLOUD_LOAD_FAILED' },
+      { status: 500 },
+    );
   }
 }
 
@@ -94,9 +97,12 @@ async function saveFromRequest(request: Request) {
       data: saved,
     });
   } catch (error) {
-    console.error('[API /user-data PUT]', error);
+    console.error('[API /user-data PUT]', { userId, error });
     const detail =
       error instanceof Error ? error.message : 'Nepodařilo se uložit cloud data.';
-    return NextResponse.json({ error: detail }, { status: 500 });
+    return NextResponse.json(
+      { error: detail, code: 'CLOUD_SAVE_FAILED' },
+      { status: 500 },
+    );
   }
 }

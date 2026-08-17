@@ -24,6 +24,23 @@ interface CloudFetchResult {
   configured: boolean;
   data: UserDataSnapshot | null;
   canonicalUserId?: string;
+  error?: string;
+  code?: string;
+}
+
+export interface LinkCloudAccountResult {
+  success: boolean;
+  error?: string;
+}
+
+async function parseApiError(response: Response): Promise<string> {
+  try {
+    const body = (await response.json()) as { error?: string; code?: string };
+    if (body.error && body.code) return `${body.error} (${body.code})`;
+    return body.error ?? `HTTP ${response.status}`;
+  } catch {
+    return `HTTP ${response.status}`;
+  }
 }
 
 async function fetchCloudSnapshot(userId: string): Promise<CloudFetchResult> {
@@ -35,7 +52,7 @@ async function fetchCloudSnapshot(userId: string): Promise<CloudFetchResult> {
   });
 
   if (!response.ok) {
-    throw new Error(`Cloud load failed (${response.status})`);
+    throw new Error(await parseApiError(response));
   }
 
   return (await response.json()) as CloudFetchResult;
@@ -53,7 +70,7 @@ async function pushCloudSnapshot(userId: string, snapshot: UserDataSnapshot): Pr
   });
 
   if (!response.ok) {
-    throw new Error(`Cloud save failed (${response.status})`);
+    throw new Error(await parseApiError(response));
   }
 
   const json = (await response.json()) as { data: UserDataSnapshot };
@@ -71,7 +88,11 @@ async function resolveStravaAccount(userId: string): Promise<CloudFetchResult | 
     body: JSON.stringify({ mode: 'strava' }),
   });
 
-  if (!response.ok) return null;
+  if (!response.ok) {
+    console.warn('[CloudSyncProvider.resolveStravaAccount]', await parseApiError(response));
+    return null;
+  }
+
   return (await response.json()) as CloudFetchResult;
 }
 
@@ -81,6 +102,11 @@ function applyCanonicalUserId(canonicalUserId: string | undefined): boolean {
   if (canonicalUserId === current) return false;
   setUserId(canonicalUserId);
   return true;
+}
+
+function hydrateCloudData(data: UserDataSnapshot): void {
+  useTrainingStore.getState().hydrateFromCloud(data);
+  setLocalUpdatedAt(data.updatedAt);
 }
 
 export function CloudSyncProvider({ children }: { children: React.ReactNode }) {
@@ -117,7 +143,7 @@ export function CloudSyncProvider({ children }: { children: React.ReactNode }) {
     async function bootstrap() {
       syncUserIdFromCookie();
       let userId = getOrCreateUserId();
-      setCloudSyncStatus('loading');
+      setCloudSyncStatus('loading', null);
 
       try {
         if (useTrainingStore.getState().stravaConnected) {
@@ -126,24 +152,32 @@ export function CloudSyncProvider({ children }: { children: React.ReactNode }) {
             userId = resolved.canonicalUserId;
           }
           if (resolved?.data && !cancelled) {
-            hydrateFromCloud(resolved.data);
-            setLocalUpdatedAt(resolved.data.updatedAt);
-            setCloudSyncStatus('idle');
+            hydrateCloudData(resolved.data);
+            setCloudSyncStatus('idle', null);
             skipSyncRef.current = false;
             return;
           }
         }
 
+        const initialUserId = userId;
         const { configured, data, canonicalUserId } = await fetchCloudSnapshot(userId);
 
         if (cancelled) return;
 
-        if (applyCanonicalUserId(canonicalUserId)) {
-          userId = canonicalUserId ?? userId;
+        if (canonicalUserId && canonicalUserId !== initialUserId) {
+          applyCanonicalUserId(canonicalUserId);
+          userId = canonicalUserId;
+          const refetch = await fetchCloudSnapshot(canonicalUserId);
+          if (refetch.data) {
+            hydrateCloudData(refetch.data);
+            setCloudSyncStatus('idle', null);
+            skipSyncRef.current = false;
+            return;
+          }
         }
 
         if (!configured) {
-          setCloudSyncStatus('offline');
+          setCloudSyncStatus('offline', null);
           skipSyncRef.current = false;
           return;
         }
@@ -152,18 +186,18 @@ export function CloudSyncProvider({ children }: { children: React.ReactNode }) {
         const localSlice = pickPersistedSlice(useTrainingStore.getState());
 
         if (data && shouldPreferCloudSnapshot(data, localSlice, localUpdatedAt)) {
-          hydrateFromCloud(data);
-          setLocalUpdatedAt(data.updatedAt);
+          hydrateCloudData(data);
         } else if (localSlice) {
           const snapshot = extractPersistedSnapshot(localSlice);
           const saved = await pushCloudSnapshot(userId, snapshot);
           setLocalUpdatedAt(saved.updatedAt);
         }
 
-        setCloudSyncStatus('idle');
+        setCloudSyncStatus('idle', null);
       } catch (error) {
-        console.error('[CloudSyncProvider.bootstrap]', error);
-        if (!cancelled) setCloudSyncStatus('error');
+        const message = error instanceof Error ? error.message : 'Cloud sync selhal.';
+        console.error('[CloudSyncProvider.bootstrap]', message, error);
+        if (!cancelled) setCloudSyncStatus('error', message);
       } finally {
         skipSyncRef.current = false;
       }
@@ -177,16 +211,17 @@ export function CloudSyncProvider({ children }: { children: React.ReactNode }) {
       if (syncTimerRef.current) clearTimeout(syncTimerRef.current);
       syncTimerRef.current = setTimeout(async () => {
         const userId = getOrCreateUserId();
-        setCloudSyncStatus('syncing');
+        setCloudSyncStatus('syncing', null);
 
         try {
           const snapshot = extractPersistedSnapshot(pickPersistedSlice(useTrainingStore.getState()));
           const saved = await pushCloudSnapshot(userId, snapshot);
           setLocalUpdatedAt(saved.updatedAt);
-          setCloudSyncStatus('idle');
+          setCloudSyncStatus('idle', null);
         } catch (error) {
-          console.error('[CloudSyncProvider.sync]', error);
-          setCloudSyncStatus('error');
+          const message = error instanceof Error ? error.message : 'Cloud sync selhal.';
+          console.error('[CloudSyncProvider.sync]', message, error);
+          setCloudSyncStatus('error', message);
         }
       }, SYNC_DEBOUNCE_MS);
     };
@@ -209,7 +244,9 @@ export function CloudSyncProvider({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
-export async function linkCloudAccountAndHydrate(targetUserId: string): Promise<boolean> {
+export async function linkCloudAccountAndHydrate(
+  targetUserId: string,
+): Promise<LinkCloudAccountResult> {
   const deviceUserId = getOrCreateUserId();
   const response = await fetch('/api/user-data/link-account', {
     method: 'POST',
@@ -221,15 +258,19 @@ export async function linkCloudAccountAndHydrate(targetUserId: string): Promise<
     body: JSON.stringify({ mode: 'manual', targetUserId }),
   });
 
-  if (!response.ok) return false;
+  if (!response.ok) {
+    const error = await parseApiError(response);
+    useTrainingStore.getState().setCloudSyncStatus('error', error);
+    return { success: false, error };
+  }
 
   const json = (await response.json()) as CloudFetchResult;
   if (json.canonicalUserId) {
     setUserId(json.canonicalUserId);
   }
   if (json.data) {
-    useTrainingStore.getState().hydrateFromCloud(json.data);
-    setLocalUpdatedAt(json.data.updatedAt);
+    hydrateCloudData(json.data);
   }
-  return true;
+  useTrainingStore.getState().setCloudSyncStatus('idle', null);
+  return { success: true };
 }

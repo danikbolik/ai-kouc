@@ -3,7 +3,7 @@ import type { CoachNote } from '../../types/coachNotes';
 import type { UploadedMethodology, UserMetrics } from '../../types/settings';
 import type { DayData } from '../../types/training';
 import type { UserDataSnapshot } from '../../types/userData';
-import { cloudHasSettingsLocalMissing } from './mergeSnapshots';
+import { cloudHasSettingsLocalMissing, hasMeaningfulSettingsData } from './mergeSnapshots';
 
 export interface PersistedStoreSlice {
   days: Record<string, DayData>;
@@ -60,10 +60,23 @@ export function shouldPreferCloudSnapshot(
   localSlice: PersistedStoreSlice,
   localUpdatedAt: string | null,
 ): boolean {
+  const cloudHasData =
+    Object.keys(cloud.days).length > 0 ||
+    hasMeaningfulSettingsData(cloud) ||
+    Boolean(cloud.apiKeys?.openaiApiKey?.trim());
+
+  const localMostlyEmpty =
+    Object.keys(localSlice.days).length === 0 &&
+    !hasMeaningfulSettingsData(localSlice) &&
+    !localSlice.apiKeys?.openaiApiKey?.trim();
+
+  if (cloudHasData && localMostlyEmpty) return true;
+
   const hasLocalCalendarData =
     Object.keys(localSlice.days).length > 0 ||
     localSlice.coachNotes.length > 0 ||
-    localSlice.uploadedMethodology.length > 0;
+    localSlice.uploadedMethodology.length > 0 ||
+    Boolean(localSlice.apiKeys?.openaiApiKey?.trim());
 
   if (!hasLocalCalendarData) return true;
   if (isCloudSnapshotNewer(cloud, localUpdatedAt)) return true;

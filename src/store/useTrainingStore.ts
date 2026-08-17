@@ -71,6 +71,7 @@ interface TrainingState {
   uploadedMethodology: UploadedMethodology[];
   coachNotes: CoachNote[];
   cloudSyncStatus: CloudSyncStatus;
+  cloudSyncError: string | null;
 }
 
 interface TrainingActions {
@@ -110,7 +111,7 @@ interface TrainingActions {
   deleteCoachNote: (id: string) => void;
   addCoachNotesFromAi: (inputs: CoachNoteInput[]) => void;
   hydrateFromCloud: (snapshot: UserDataSnapshot) => void;
-  setCloudSyncStatus: (status: CloudSyncStatus) => void;
+  setCloudSyncStatus: (status: CloudSyncStatus, error?: string | null) => void;
 }
 
 function bumpDay(
@@ -186,6 +187,7 @@ export const useTrainingStore = create<TrainingState & TrainingActions>()(
       uploadedMethodology: [],
       coachNotes: [],
       cloudSyncStatus: 'loading',
+      cloudSyncError: null,
 
       setSelectedDate: (date) => set({ selectedDate: date }),
       setCalendarAnchorDate: (date) => set({ calendarAnchorDate: date }),
@@ -477,7 +479,8 @@ export const useTrainingStore = create<TrainingState & TrainingActions>()(
           lastStravaActivityAt: snapshot.lastStravaActivityAt ?? null,
         }),
 
-      setCloudSyncStatus: (status) => set({ cloudSyncStatus: status }),
+      setCloudSyncStatus: (status, error = null) =>
+        set({ cloudSyncStatus: status, cloudSyncError: error }),
 
       setStravaConnected: (connected) => set({ stravaConnected: connected }),
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { dayToLegacySessions, normalizeDayData } from '../../lib/dayData';
 import {
@@ -10,9 +10,11 @@ import {
   getMatchIndicatorColors,
 } from '../../lib/colors';
 import { getTodayDate, getWeekdayShort } from '../../lib/dates';
+import { computeWorkoutPaceBreakdown } from '../../lib/workoutSegmentBreakdown';
 import { useTrainingStore } from '../../store/useTrainingStore';
 import { StravaActivityDetailTabs } from './StravaActivityDetails';
-import type { WorkoutSession } from '../../types/training';
+import { WorkoutSegmentBreakdownTable } from './WorkoutSegmentBreakdownTable';
+import type { PlannedWorkout, WorkoutSession } from '../../types/training';
 
 type DayTimeState = 'past' | 'today' | 'future';
 
@@ -44,10 +46,12 @@ function ComparisonRow({
 
 function SessionDetailSection({
   session,
+  plannedWorkout,
   date,
   today,
 }: {
   session: WorkoutSession;
+  plannedWorkout?: PlannedWorkout;
   date: string;
   today: string;
 }) {
@@ -55,6 +59,17 @@ function SessionDetailSection({
   const timeState = getDayTimeState(date, today);
   const matchStatus = computeSessionMatchStatus(session, date, today);
   const matchColors = matchStatus ? getMatchIndicatorColors(matchStatus) : null;
+
+  const paceBreakdown = plannedWorkout
+    ? computeWorkoutPaceBreakdown(
+        plannedWorkout,
+        session.actual?.laps,
+        session.actual?.avgPace,
+      )
+    : null;
+
+  const mainPlannedPace = plannedWorkout?.targetPace ?? session.planned.targetPace;
+  const mainPlannedDistance = plannedWorkout?.distanceKm ?? session.planned.distanceKm;
 
   return (
     <div className={`rounded-xl border p-4 ${activityCardClassName(session.type)}`}>
@@ -112,7 +127,7 @@ function SessionDetailSection({
             </div>
 
             <ComparisonRow
-              label="Vzdálenost"
+              label="Vzdálenost celkem"
               planned={
                 session.planned.distanceKm !== undefined
                   ? `${session.planned.distanceKm} km`
@@ -126,18 +141,49 @@ function SessionDetailSection({
                   : undefined
               }
             />
+            {plannedWorkout?.warmUp?.value ? (
+              <ComparisonRow
+                label="Rozklus"
+                planned={
+                  plannedWorkout.warmUp.unit === 'km'
+                    ? `${plannedWorkout.warmUp.value} km`
+                    : `${plannedWorkout.warmUp.value} min`
+                }
+                actual={paceBreakdown?.warmUpPace ? `@ ${paceBreakdown.warmUpPace}/km` : undefined}
+              />
+            ) : null}
+            {mainPlannedDistance || mainPlannedPace ? (
+              <ComparisonRow
+                label="Hlavní motiv"
+                planned={[
+                  mainPlannedDistance ? `${mainPlannedDistance} km` : null,
+                  mainPlannedPace ? `@ ${mainPlannedPace}` : null,
+                ]
+                  .filter(Boolean)
+                  .join(' ')}
+                actual={paceBreakdown?.mainPace ? `@ ${paceBreakdown.mainPace}/km` : session.actual?.avgPace}
+              />
+            ) : (
+              <ComparisonRow
+                label="Tempo (hlavní motiv)"
+                planned={mainPlannedPace}
+                actual={paceBreakdown?.mainPace ?? session.actual?.avgPace}
+              />
+            )}
+            {plannedWorkout?.coolDown?.value ? (
+              <ComparisonRow
+                label="Výklus"
+                planned={
+                  plannedWorkout.coolDown.unit === 'km'
+                    ? `${plannedWorkout.coolDown.value} km`
+                    : `${plannedWorkout.coolDown.value} min`
+                }
+                actual={paceBreakdown?.coolDownPace ? `@ ${paceBreakdown.coolDownPace}/km` : undefined}
+              />
+            ) : null}
             <ComparisonRow
-              label="Čas"
-              actual={
-                session.actual?.durationMin && session.actual.durationMin > 0
-                  ? `${session.actual.durationMin} min`
-                  : undefined
-              }
-            />
-            <ComparisonRow
-              label="Tempo"
-              planned={session.planned.targetPace}
-              actual={session.actual?.avgPace}
+              label="Tempo celkem"
+              actual={paceBreakdown?.overallPace ?? session.actual?.avgPace}
             />
             <ComparisonRow
               label="Tepová frekvence"
@@ -164,6 +210,10 @@ function SessionDetailSection({
           </div>
         }
       />
+
+      {plannedWorkout && (
+        <WorkoutSegmentBreakdownTable workout={plannedWorkout} laps={session.actual?.laps} />
+      )}
 
       {/* Citace z knihy */}
       {session.planned.bookReference && (
@@ -206,9 +256,20 @@ export function WorkoutDetailModal() {
   const [userComment, setUserComment] = useState('');
   const [workoutNotes, setWorkoutNotes] = useState('');
   const [notesSaved, setNotesSaved] = useState(false);
+  const notesDirtyRef = useRef(false);
+  const lastLoadedSessionRef = useRef<string | null>(null);
+
+  const normalizedDay = dayData ? normalizeDayData(dayData) : null;
+  const activePlannedWorkout = normalizedDay?.plannedWorkouts.find(
+    (w) => w.id === (activeSessionId ?? selectedSessionId),
+  );
 
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen) {
+      notesDirtyRef.current = false;
+      lastLoadedSessionRef.current = null;
+      return;
+    }
 
     const initialSessionId =
       selectedSessionId ?? sessions[0]?.id ?? null;
@@ -217,8 +278,11 @@ export function WorkoutDetailModal() {
     setReadinessScore(dayData?.feedback?.readinessScore ?? 5);
     setUserComment(dayData?.feedback?.userComment ?? '');
 
-    const initialSession = sessions.find((s) => s.id === initialSessionId) ?? sessions[0];
-    setWorkoutNotes(initialSession?.planned?.notes ?? '');
+    if (!notesDirtyRef.current) {
+      const initialSession = sessions.find((s) => s.id === initialSessionId) ?? sessions[0];
+      setWorkoutNotes(initialSession?.planned?.notes ?? '');
+      lastLoadedSessionRef.current = initialSessionId;
+    }
     setNotesSaved(false);
 
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -232,15 +296,20 @@ export function WorkoutDetailModal() {
       document.body.style.overflow = '';
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [isOpen, selectedDate, selectedSessionId, dayData, sessions, closeDetailModal]);
+  }, [isOpen, selectedDate, selectedSessionId, dayData?.feedback, closeDetailModal]);
 
   const activeSession = sessions.find((s) => s.id === activeSessionId) ?? sessions[0];
 
   useEffect(() => {
-    if (!isOpen || !activeSession) return;
-    setWorkoutNotes(activeSession.planned?.notes ?? '');
+    if (!isOpen || !activeSessionId) return;
+    if (notesDirtyRef.current && lastLoadedSessionRef.current === activeSessionId) return;
+
+    const session = sessions.find((s) => s.id === activeSessionId);
+    setWorkoutNotes(session?.planned?.notes ?? '');
+    lastLoadedSessionRef.current = activeSessionId;
+    notesDirtyRef.current = false;
     setNotesSaved(false);
-  }, [isOpen, activeSession?.id, activeSession?.planned?.notes]);
+  }, [isOpen, activeSessionId, sessions]);
 
   if (!isOpen) return null;
 
@@ -250,6 +319,7 @@ export function WorkoutDetailModal() {
   const handleSaveWorkoutNotes = () => {
     if (!activeSession) return;
     updateWorkoutNotes(selectedDate, activeSession.id, workoutNotes);
+    notesDirtyRef.current = false;
     setNotesSaved(true);
     window.setTimeout(() => setNotesSaved(false), 2000);
   };
@@ -342,7 +412,12 @@ export function WorkoutDetailModal() {
               <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
                 Detail tréninku &amp; srovnání
               </h3>
-              <SessionDetailSection session={activeSession} date={selectedDate} today={today} />
+              <SessionDetailSection
+                session={activeSession}
+                plannedWorkout={activePlannedWorkout}
+                date={selectedDate}
+                today={today}
+              />
             </section>
           ) : (
             <p className="text-center text-sm text-slate-400">Pro tento den není naplánován trénink.</p>
@@ -405,13 +480,15 @@ export function WorkoutDetailModal() {
                 <textarea
                   value={workoutNotes}
                   onChange={(e) => {
+                    notesDirtyRef.current = true;
                     setWorkoutNotes(e.target.value);
                     setNotesSaved(false);
                   }}
                   onBlur={handleSaveWorkoutNotes}
                   rows={3}
+                  aria-label="Poznámka k tréninku"
                   placeholder='Např. "Cítil jsem zatuhlé achilovky po 8. km"'
-                  className="w-full resize-none rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 outline-none ring-emerald-500 focus:ring-2"
+                  className="pointer-events-auto w-full resize-none rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none ring-emerald-500 focus:ring-2"
                 />
               </label>
 

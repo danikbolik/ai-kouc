@@ -217,6 +217,9 @@ export interface WorkoutSession {
 
     distanceKm?: number;
 
+    /** Vzdálenost hlavního motivu bez rozklusu a výklusu. */
+    mainDistanceKm?: number;
+
     targetPace?: string;
 
     targetHR?: number;
@@ -224,6 +227,12 @@ export interface WorkoutSession {
     description: string;
 
     notes?: string;
+
+    warmUp?: WarmCoolSegment;
+
+    coolDown?: WarmCoolSegment;
+
+    intervals?: WorkoutInterval[];
 
     bookReference?: {
 

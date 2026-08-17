@@ -143,10 +143,14 @@ export function dayToLegacySessions(day: DayData): WorkoutSession[] {
       planned: {
         description: planned.description,
         distanceKm: getPlannedWorkoutTotalDistanceKm(planned),
+        mainDistanceKm: planned.distanceKm,
         targetPace: planned.targetPace,
         targetHR: planned.targetHR,
         bookReference: planned.bookReference,
         notes: planned.notes,
+        warmUp: planned.warmUp,
+        coolDown: planned.coolDown,
+        intervals: planned.intervals,
       },
       actual: matchedActivity
         ? {

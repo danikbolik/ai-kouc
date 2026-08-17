@@ -7,7 +7,8 @@ import {
   isSupportedMethodologyFile,
   readMethodologyFile,
 } from '../../lib/readMethodologyFile';
-import { getOrCreateUserId } from '../../lib/userId';
+import { linkCloudAccountAndHydrate } from '../providers/CloudSyncProvider';
+import { getOrCreateUserId, isValidUserIdFormat } from '../../lib/userId';
 import {
   DEFAULT_HR_ZONES,
   DEFAULT_PACE_ZONES,
@@ -79,6 +80,11 @@ export function SettingsDrawer() {
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
+  const cloudSyncStatus = useTrainingStore((s) => s.cloudSyncStatus);
+  const stravaConnected = useTrainingStore((s) => s.stravaConnected);
+  const [linkTargetId, setLinkTargetId] = useState('');
+  const [linkFeedback, setLinkFeedback] = useState<string | null>(null);
+  const [isLinking, setIsLinking] = useState(false);
 
   useEffect(() => {
     if (!isSettingsOpen) return;
@@ -118,8 +124,29 @@ export function SettingsDrawer() {
     setApiKeys({
       openaiApiKey: openaiApiKey.trim(),
     });
-    setSaveFeedback('OpenAI klíč uložen do prohlížeče.');
+    setSaveFeedback('OpenAI klíč uložen a synchronizuje se do cloudu.');
     setTimeout(() => setSaveFeedback(null), 3000);
+  };
+
+  const handleLinkCloudAccount = async () => {
+    const target = linkTargetId.trim();
+    if (!isValidUserIdFormat(target)) {
+      setLinkFeedback('Neplatné Cloud ID – zkopíruj UUID z druhého zařízení.');
+      return;
+    }
+
+    setIsLinking(true);
+    setLinkFeedback(null);
+    try {
+      const ok = await linkCloudAccountAndHydrate(target);
+      setLinkFeedback(
+        ok
+          ? 'Účet propojen – parametry, paměť trenéra a metodika načteny z cloudu.'
+          : 'Propojení selhalo – zkontroluj Cloud ID a připojení k Supabase.',
+      );
+    } finally {
+      setIsLinking(false);
+    }
   };
 
   const handleSaveUserMetrics = () => {
@@ -566,13 +593,50 @@ export function SettingsDrawer() {
                 <div>
                   <h3 className="text-sm font-semibold text-slate-900">API klíče</h3>
                   <p className="mt-1 text-xs text-slate-500">
-                    OpenAI klíč a tréninková data se synchronizují do cloudu (Supabase), pokud je
-                    nakonfigurován. Strava se propojuje v záložce Strava Integrace.
+                    Osobní parametry, paměť trenéra a metodika se automaticky synchronizují do
+                    Supabase. Na mobilu propoj stejný účet přes Strava nebo vlož Cloud ID z PC.
                   </p>
                   <p className="mt-2 rounded-lg bg-slate-100 px-3 py-2 text-[10px] text-slate-600">
                     Cloud ID tohoto zařízení:{' '}
                     <span className="font-mono font-semibold">{getOrCreateUserId()}</span>
+                    {cloudSyncStatus && (
+                      <span className="ml-2 text-slate-500">· sync: {cloudSyncStatus}</span>
+                    )}
                   </p>
+
+                  <div className="mt-3 space-y-2 rounded-xl border border-slate-200 bg-white p-3">
+                    <p className="text-xs font-semibold text-slate-800">Synchronizace mezi zařízeními</p>
+                    {stravaConnected ? (
+                      <p className="text-[11px] text-emerald-700">
+                        Strava propojena – data se slučují automaticky podle athlete ID.
+                      </p>
+                    ) : (
+                      <p className="text-[11px] text-slate-500">
+                        Doporučeno: propoj Strava na obou zařízeních (záložka Strava Integrace).
+                      </p>
+                    )}
+                    <label className="block text-[11px] text-slate-600">
+                      Nebo vlož Cloud ID z druhého zařízení (PC):
+                      <input
+                        type="text"
+                        value={linkTargetId}
+                        onChange={(e) => setLinkTargetId(e.target.value)}
+                        placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                        className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 font-mono text-xs text-slate-900 outline-none ring-emerald-500 focus:ring-2"
+                      />
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => void handleLinkCloudAccount()}
+                      disabled={isLinking}
+                      className="w-full rounded-lg border border-emerald-600 px-3 py-2 text-xs font-semibold text-emerald-700 hover:bg-emerald-50 disabled:opacity-50"
+                    >
+                      {isLinking ? 'Propojuji…' : 'Propojit s cloud účtem'}
+                    </button>
+                    {linkFeedback && (
+                      <p className="text-[11px] font-medium text-emerald-700">{linkFeedback}</p>
+                    )}
+                  </div>
                 </div>
 
                 <div className="space-y-4 rounded-xl border border-slate-200 bg-slate-50 p-4">

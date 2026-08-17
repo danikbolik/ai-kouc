@@ -5,23 +5,28 @@ import { useEffect, useRef, useState } from 'react';
 import { buildApiKeyHeaders } from '../../lib/apiKeyHeaders';
 import {
   extractPersistedSnapshot,
-  isCloudSnapshotNewer,
   pickPersistedSlice,
+  shouldPreferCloudSnapshot,
 } from '../../lib/userData/snapshot';
 import {
   getLocalUpdatedAt,
   getOrCreateUserId,
   setLocalUpdatedAt,
+  setUserId,
+  syncUserIdFromCookie,
 } from '../../lib/userId';
 import { useTrainingStore } from '../../store/useTrainingStore';
 import type { UserDataSnapshot } from '../../types/userData';
 
 const SYNC_DEBOUNCE_MS = 1500;
 
-async function fetchCloudSnapshot(userId: string): Promise<{
+interface CloudFetchResult {
   configured: boolean;
   data: UserDataSnapshot | null;
-}> {
+  canonicalUserId?: string;
+}
+
+async function fetchCloudSnapshot(userId: string): Promise<CloudFetchResult> {
   const response = await fetch('/api/user-data', {
     headers: {
       ...buildApiKeyHeaders(useTrainingStore.getState().apiKeys),
@@ -33,10 +38,7 @@ async function fetchCloudSnapshot(userId: string): Promise<{
     throw new Error(`Cloud load failed (${response.status})`);
   }
 
-  return (await response.json()) as {
-    configured: boolean;
-    data: UserDataSnapshot | null;
-  };
+  return (await response.json()) as CloudFetchResult;
 }
 
 async function pushCloudSnapshot(userId: string, snapshot: UserDataSnapshot): Promise<UserDataSnapshot> {
@@ -56,6 +58,29 @@ async function pushCloudSnapshot(userId: string, snapshot: UserDataSnapshot): Pr
 
   const json = (await response.json()) as { data: UserDataSnapshot };
   return json.data;
+}
+
+async function resolveStravaAccount(userId: string): Promise<CloudFetchResult | null> {
+  const response = await fetch('/api/user-data/link-account', {
+    method: 'POST',
+    headers: {
+      ...buildApiKeyHeaders(useTrainingStore.getState().apiKeys),
+      'X-User-Id': userId,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ mode: 'strava' }),
+  });
+
+  if (!response.ok) return null;
+  return (await response.json()) as CloudFetchResult;
+}
+
+function applyCanonicalUserId(canonicalUserId: string | undefined): boolean {
+  if (!canonicalUserId) return false;
+  const current = getOrCreateUserId();
+  if (canonicalUserId === current) return false;
+  setUserId(canonicalUserId);
+  return true;
 }
 
 export function CloudSyncProvider({ children }: { children: React.ReactNode }) {
@@ -90,13 +115,32 @@ export function CloudSyncProvider({ children }: { children: React.ReactNode }) {
     let cancelled = false;
 
     async function bootstrap() {
-      const userId = getOrCreateUserId();
+      syncUserIdFromCookie();
+      let userId = getOrCreateUserId();
       setCloudSyncStatus('loading');
 
       try {
-        const { configured, data } = await fetchCloudSnapshot(userId);
+        if (useTrainingStore.getState().stravaConnected) {
+          const resolved = await resolveStravaAccount(userId);
+          if (resolved?.canonicalUserId && applyCanonicalUserId(resolved.canonicalUserId)) {
+            userId = resolved.canonicalUserId;
+          }
+          if (resolved?.data && !cancelled) {
+            hydrateFromCloud(resolved.data);
+            setLocalUpdatedAt(resolved.data.updatedAt);
+            setCloudSyncStatus('idle');
+            skipSyncRef.current = false;
+            return;
+          }
+        }
+
+        const { configured, data, canonicalUserId } = await fetchCloudSnapshot(userId);
 
         if (cancelled) return;
+
+        if (applyCanonicalUserId(canonicalUserId)) {
+          userId = canonicalUserId ?? userId;
+        }
 
         if (!configured) {
           setCloudSyncStatus('offline');
@@ -106,15 +150,11 @@ export function CloudSyncProvider({ children }: { children: React.ReactNode }) {
 
         const localUpdatedAt = getLocalUpdatedAt();
         const localSlice = pickPersistedSlice(useTrainingStore.getState());
-        const hasLocalData =
-          Object.keys(localSlice.days).length > 0 ||
-          localSlice.coachNotes.length > 0 ||
-          localSlice.uploadedMethodology.length > 0;
 
-        if (data && (isCloudSnapshotNewer(data, localUpdatedAt) || !hasLocalData)) {
+        if (data && shouldPreferCloudSnapshot(data, localSlice, localUpdatedAt)) {
           hydrateFromCloud(data);
           setLocalUpdatedAt(data.updatedAt);
-        } else if (hasLocalData) {
+        } else if (localSlice) {
           const snapshot = extractPersistedSnapshot(localSlice);
           const saved = await pushCloudSnapshot(userId, snapshot);
           setLocalUpdatedAt(saved.updatedAt);
@@ -167,4 +207,29 @@ export function CloudSyncProvider({ children }: { children: React.ReactNode }) {
   }, [hydrateFromCloud, setCloudSyncStatus, storeHydrated]);
 
   return <>{children}</>;
+}
+
+export async function linkCloudAccountAndHydrate(targetUserId: string): Promise<boolean> {
+  const deviceUserId = getOrCreateUserId();
+  const response = await fetch('/api/user-data/link-account', {
+    method: 'POST',
+    headers: {
+      ...buildApiKeyHeaders(useTrainingStore.getState().apiKeys),
+      'X-User-Id': deviceUserId,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ mode: 'manual', targetUserId }),
+  });
+
+  if (!response.ok) return false;
+
+  const json = (await response.json()) as CloudFetchResult;
+  if (json.canonicalUserId) {
+    setUserId(json.canonicalUserId);
+  }
+  if (json.data) {
+    useTrainingStore.getState().hydrateFromCloud(json.data);
+    setLocalUpdatedAt(json.data.updatedAt);
+  }
+  return true;
 }

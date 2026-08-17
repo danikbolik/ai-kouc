@@ -5,6 +5,7 @@ import {
   isStravaConfigured,
   type StravaTokenResponse,
 } from '@/lib/strava';
+import { resolveStravaLinkedAccount } from '@/lib/userData/accountLinking';
 import {
   getAppBaseUrlFromRequest,
   getStravaClientIdFromEnv,
@@ -113,7 +114,14 @@ export async function GET(request: Request) {
 
     if (userId) {
       try {
-        await saveStravaTokensForUser(userId, {
+        let canonicalUserId = userId;
+
+        if (tokens.athlete?.id) {
+          const result = await resolveStravaLinkedAccount(userId, tokens.athlete.id);
+          canonicalUserId = result.canonicalUserId;
+        }
+
+        await saveStravaTokensForUser(canonicalUserId, {
           accessToken: tokens.access_token,
           refreshToken: tokens.refresh_token,
           expiresAt: tokens.expires_at,
@@ -122,6 +130,16 @@ export async function GET(request: Request) {
             ? `${tokens.athlete.firstname} ${tokens.athlete.lastname}`.trim()
             : undefined,
         });
+
+        if (canonicalUserId !== userId) {
+          response.cookies.set('ai_coach_user_id', canonicalUserId, {
+            httpOnly: false,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'lax',
+            path: '/',
+            maxAge: 60 * 60 * 24 * 365,
+          });
+        }
       } catch (cloudError) {
         console.error('[Strava callback] Cloud token save failed (cookies still set):', cloudError);
       }

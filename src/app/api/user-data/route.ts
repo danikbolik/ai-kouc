@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 
 import {
+  findUserIdByStravaAthleteId,
   getUserData,
   isCloudDbConfigured,
   isValidUserId,
@@ -32,10 +33,22 @@ export async function GET(request: Request) {
   }
 
   try {
-    const data = await getUserData(userId);
+    let data = await getUserData(userId);
+    let canonicalUserId = userId;
+
+    const athleteId = data?.stravaTokens?.athleteId;
+    if (athleteId) {
+      const linkedId = await findUserIdByStravaAthleteId(athleteId, userId);
+      if (linkedId && linkedId !== userId) {
+        canonicalUserId = linkedId;
+        data = await getUserData(linkedId);
+      }
+    }
+
     return NextResponse.json({
       configured: true,
       data,
+      canonicalUserId: canonicalUserId !== userId ? canonicalUserId : undefined,
     });
   } catch (error) {
     console.error('[API /user-data GET]', error);

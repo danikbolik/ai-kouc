@@ -1,4 +1,6 @@
 -- Spusť v Supabase SQL Editoru (Dashboard → SQL → New query)
+-- Pokud tabulka user_data už existuje bez sloupce payload, spusť nejdřív:
+--   supabase/migrations/001_add_payload_column.sql
 
 create table if not exists user_data (
   user_id text primary key,
@@ -6,6 +8,8 @@ create table if not exists user_data (
   updated_at timestamptz not null default now()
 );
 
+alter table user_data add column if not exists payload jsonb not null default '{}'::jsonb;
+alter table user_data add column if not exists updated_at timestamptz not null default now();
 alter table user_data add column if not exists strava_athlete_id bigint unique;
 
 create index if not exists user_data_updated_at_idx on user_data (updated_at desc);

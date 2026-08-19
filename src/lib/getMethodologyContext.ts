@@ -1,129 +1,35 @@
 import fs from 'fs';
 import path from 'path';
 
-import { parseMethodologyBuffer } from '@/lib/methodology/parseServerFile';
 import { buildFullMethodicLibraryContext } from '@/lib/ragKnowledge';
 
-const SUPPORTED_EXTENSIONS = new Set(['.txt', '.md', '.pdf']);
+export const METODIKA_SUMAR_FILENAME = 'METODIKA_SUMAR.txt';
 
-/** Složky prohledávané při sestavení SYSTEM_METHODOLOGY_CONTEXT (v pořadí priority). */
-const METHODOLOGY_SEARCH_DIRS = [
-  path.join(process.cwd(), 'data', 'methodology'),
-  path.join(process.cwd(), 'methodology'),
-  path.join(process.cwd(), 'knowledge'),
-];
-
-interface MethodologyFileEntry {
-  rootLabel: string;
-  relativePath: string;
-  absolutePath: string;
-}
+const METODIKA_SUMAR_PATH = path.join(process.cwd(), METODIKA_SUMAR_FILENAME);
 
 function getFallbackMethodologyContext(reason: string): string {
   return [
-    `## Záložní metodický kontext (lokální soubory nebyly načteny: ${reason})`,
+    `## Záložní metodický kontext (${METODIKA_SUMAR_FILENAME} nebyl načten: ${reason})`,
     buildFullMethodicLibraryContext(),
   ].join('\n\n');
 }
 
-function collectMethodologyFiles(dir: string, rootLabel: string): MethodologyFileEntry[] {
-  const entries: MethodologyFileEntry[] = [];
-
-  if (!fs.existsSync(dir)) {
-    return entries;
-  }
-
-  const walk = (currentDir: string): void => {
-    for (const entry of fs.readdirSync(currentDir, { withFileTypes: true })) {
-      const absolutePath = path.join(currentDir, entry.name);
-
-      if (entry.isDirectory()) {
-        walk(absolutePath);
-        continue;
-      }
-
-      const ext = path.extname(entry.name).toLowerCase();
-      if (!SUPPORTED_EXTENSIONS.has(ext)) continue;
-
-      entries.push({
-        rootLabel,
-        relativePath: path.relative(dir, absolutePath).replace(/\\/g, '/'),
-        absolutePath,
-      });
-    }
-  };
-
-  walk(dir);
-  return entries;
-}
-
-function discoverMethodologyFiles(): MethodologyFileEntry[] {
-  const seenPaths = new Set<string>();
-  const allFiles: MethodologyFileEntry[] = [];
-
-  for (const dir of METHODOLOGY_SEARCH_DIRS) {
-    const rootLabel = path.relative(process.cwd(), dir).replace(/\\/g, '/') || dir;
-    for (const file of collectMethodologyFiles(dir, rootLabel)) {
-      if (seenPaths.has(file.absolutePath)) continue;
-      seenPaths.add(file.absolutePath);
-      allFiles.push(file);
-    }
-  }
-
-  return allFiles.sort((a, b) => {
-    const byRoot = a.rootLabel.localeCompare(b.rootLabel, 'cs');
-    if (byRoot !== 0) return byRoot;
-    return a.relativePath.localeCompare(b.relativePath, 'cs');
-  });
-}
-
-async function readMethodologyFileContent(entry: MethodologyFileEntry): Promise<string | null> {
-  const label = `${entry.rootLabel}/${entry.relativePath}`;
-
-  try {
-    const buffer = fs.readFileSync(entry.absolutePath);
-    const { content } = await parseMethodologyBuffer(buffer, entry.relativePath);
-
-    if (!content.trim()) {
-      return `### ${label}\n(prázdný soubor)`;
-    }
-
-    return `### ${label}\n${content.trim()}`;
-  } catch (error) {
-    console.warn(
-      `[loadSystemMethodologyContext] Nepodařilo se načíst "${label}":`,
-      error instanceof Error ? error.message : error,
-    );
-    return null;
-  }
-}
-
 /**
- * Načte VŠECHNY .txt, .md a .pdf soubory z metodických složek projektu
- * (rekurzivně) a spojí je do jednoho kontextu pro system prompt.
+ * Načte hlavní metodický podklad pro chat – výhradně METODIKA_SUMAR.txt v kořeni projektu.
  */
 export async function loadSystemMethodologyContext(): Promise<string> {
   try {
-    const files = discoverMethodologyFiles();
-
-    if (files.length === 0) {
-      return getFallbackMethodologyContext(
-        'žádné soubory v data/methodology, methodology ani knowledge',
-      );
+    if (!fs.existsSync(METODIKA_SUMAR_PATH)) {
+      console.warn(`[loadSystemMethodologyContext] Soubor neexistuje: ${METODIKA_SUMAR_PATH}`);
+      return getFallbackMethodologyContext('soubor v kořeni projektu neexistuje');
     }
 
-    const sections: string[] = [];
-
-    for (const file of files) {
-      const section = await readMethodologyFileContent(file);
-      if (section) sections.push(section);
+    const content = fs.readFileSync(METODIKA_SUMAR_PATH, 'utf-8').trim();
+    if (!content) {
+      return getFallbackMethodologyContext('soubor je prázdný');
     }
 
-    if (sections.length === 0) {
-      return getFallbackMethodologyContext('všechny soubory selhaly při načítání');
-    }
-
-    return sections.join('\n\n');
+    return content;
   } catch (error) {
     console.error('[loadSystemMethodologyContext] Fatální chyba:', error);
     return getFallbackMethodologyContext(
@@ -137,7 +43,12 @@ export async function getMethodologyContext(): Promise<string> {
   return loadSystemMethodologyContext();
 }
 
-/** Vrátí seznam názvů metodických souborů (pro logování / debug) */
+/** Vrátí cestu k načtenému souboru (pro logování / debug) */
+export function getMethodologySummaryPath(): string {
+  return METODIKA_SUMAR_PATH;
+}
+
+/** @deprecated Použij getMethodologySummaryPath */
 export function listMethodologyFiles(): string[] {
-  return discoverMethodologyFiles().map((file) => `${file.rootLabel}/${file.relativePath}`);
+  return fs.existsSync(METODIKA_SUMAR_PATH) ? [METODIKA_SUMAR_FILENAME] : [];
 }

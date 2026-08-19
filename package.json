@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "generate:metodika": "npx tsx scripts/generate-metodika-sumar.ts"
   },
   "dependencies": {
     "@ai-sdk/google": "^1.2.22",

@@ -1,0 +1,214 @@
+# METODIKA_SUMAR – hlavní tréninkový podklad pro AI kouče
+Verze: 1.0 | Zaměření: výkonnostní semi-pro vytrvalec / orientační běžec
+Týdenní objemy typicky 70–100 km | Double Threshold | laktátové testování
+
+================================================================================
+1. LAKTÁTOVÉ PRAHY A NORSKÝ MODEL (Double Threshold)
+================================================================================
+
+## Laktátové prahy
+- **LT1 (aerobní práh / AeT):** ~1.5–2.0 mmol/l – hranice čistě aerobního metabolismu
+- **LT2 (anaerobní práh / ANP / MLSS):** ~4.0 mmol/l – laktátový strop (Maximal Lactate Steady State)
+- **Prahová zóna pro trénink:** 2.0–4.0 mmol/l – hlavní pracovní pásmo pro threshold trénink
+- Autoregulace intenzity: běhej na pocit/laktát ~4 mmol/l, NE na rigidní tempo bez kontextu únavy
+
+## Norský model / Double Threshold
+- **Double Threshold den:** 2× prahová jednotka v jednom dni (typicky ráno + odpoledne/evening)
+  * Ranní blok: delší prahové úseky (např. 5×2 km @ ~4 mmol/l, pauza 60–90 s klus)
+  * Odpolední blok: kratší úseky nebo stejná délka s nižším objemem (např. 3×2 km)
+- Cíl: maximalizovat čas v prahové zóně (2.0–4.0 mmol/l) bez překročení do VO2max zóny
+- Double Threshold max 1–2× týdně; nikdy den po dlouhém běhu nebo VO2max bez 48 h odpočinku
+- Při únavě (TSB -15 až -5): modifikuj (zkrácení sérií, delší pauzy), NE zruš celou jednotku
+
+================================================================================
+2. TEPOVÉ ZÓNY (% HRmax a individuální BPM)
+================================================================================
+
+| Zóna | % HRmax   | Charakteristika                          | Podíl týdenního objemu |
+|------|-----------|------------------------------------------|------------------------|
+| Z1   | 59–74 %   | Regenerace, rozcvička, velmi lehký klus  | součást 80 % easy      |
+| Z2   | 75–84 %   | Aerobní vytrvalost (AeT), dlouhý klus    | součást 80 % easy      |
+| Z3   | 85–88 %   | Střední zátěž, přechod AeT–AnT           | minimálně (< 10 %)     |
+| Z4   | 89–94 %   | Prahový běh (AnT), tempo běh             | 10–15 % objemu         |
+| Z5   | 95–100 %  | VO₂max intervaly, maximální zátěž        | 5–10 % objemu          |
+
+PRAVIDLA:
+- 80 % týdenního objemu v Z1–Z2 (polarizovaný model Seiler)
+- Z4–Z5 max. 10–15 % objemu
+- Z1–Z2 dohromady = POUZE TF v individuálních BPM rozsazích sportovce (ne širší!)
+- Referenční prahy: AeT (bpm) | ANP/LT (bpm) | TFmax (bpm) – z profilu sportovce
+- NIKDY neoznačuj TF 165 bpm jako Z1–Z2 pokud ANP sportovce je nižší
+- Tempové zóny (min/km) a tepové zóny (BPM) jsou RŮZNÉ systémy – nepleť je
+
+================================================================================
+3. TEMPOVÉ ZÓNY A INTERVALOVÉ BLOKY
+================================================================================
+
+## Prahové / threshold úseky
+- 5×2 km @ prahové tempo (TF Z4, ~4 mmol/l), pauza 60–90 s klus
+- 10×1 km @ prahové tempo, pauza 45–60 s klus
+- 3×3 km @ tempo, pauza 2 min klus
+- Daniels: prahový běh 88–92 % TFmax
+
+## VO₂max intervaly
+- Délka úseku: 3–5 minut v Z5
+- Pauza: 1–2 minuty klus nebo stání
+- Počet opakování: 4–6 dle formy a únavy
+- Příklady: 5×3 min, 6×4 min, 18×300 m (pauza 30–45 s)
+- Účel: rozvoj VO₂max a rychlostní vytrvalosti
+- NEplánuj při readinessScore ≥ 8 nebo po 2 náročných dnech za sebou
+- Po intervalovém tréninku následuje den lehké regenerace (Z1)
+
+## Modifikace při únavě (readiness 7–8, TSB -15 až -5)
+- 18×300 m → 12–15×300 m; pauza 30 s → 45–60 s
+- 5×2 km → 3×2 km nebo 5×1.5 km
+- Tempo 3:00/km → 3:05/km NEBO řízení dle TF/laktátu
+- Autoregulace: „Pokud po 4. opakování neudržíš tempo, ukonči předčasně"
+
+## Dlouhý běh
+- 20–30 % týdenního objemu
+- Tempo: Z2, konverzace možná celou dobu
+- Poslední longrun 3 týdny před závodem, poté taper
+- Skok délky longrunu > 25 % oproti dosavadnímu maximu = primární riziko zranění (Bakken)
+
+================================================================================
+4. TÝDENNÍ MIKROCYKLUS
+================================================================================
+
+Typická struktura výkonnostního běžce:
+- **Po:** Kvalita / úseky / VO2max
+- **Út:** Volný běh / aerobní objem (Z1–Z2)
+- **St:** Prahové úseky / Double Threshold
+- **Čt:** Regenerační klus / recovery
+- **Pá:** Doplňkový objem / rovinky / technika
+- **So:** Kvalita / dlouhý běh / specifická jednotka
+- **Ne:** Long run NEBO volno (max 1 den)
+
+LIMITY:
+- Max **1 den volna** v běžném týdnu (2 pouze v deload/taper)
+- Max **2 regenerační klusy** (Z1) – ne 5 dní „regenerace"
+- Po úpravě jednoho dne kompenzuj cíleně (1 lehčí den), ne vyprázdněním celého týdne
+- Vysoce intenzivní trénink: min. 48 h regenerace před další hard session (Seiler)
+
+================================================================================
+5. MESOCYKLUS 3+1 A PERIODIZACE
+================================================================================
+
+## Mesocyklus 3+1
+- Týdny 1–3: progresivní budování objemu a intenzity
+- Týden 4 (DELOAD): snížení objemu o **30–40 %**, prioritizuj regeneraci
+- V deload týdnu NIKDY nenavrhuj vyšší objem/intenzitu než v týdnu 3
+- Progrese objemu max. 10–15 % týdně (Canova) – jinak riziko přetrénování
+
+## Makrocyklus – fáze přípravy
+| Fáze              | Zaměření                                              |
+|-------------------|-------------------------------------------------------|
+| Zimní báze        | 80 %+ Z1–Z2, longruny, kopce/síla, technika           |
+| Přípravný blok    | Postupné tempo, delší prahové úseky                  |
+| Objemový blok     | Vysoký km v Z2, 1 prahový trénink/týden               |
+| Prahový blok      | Prahové běhy, race-specific tempo, 75–80 % easy       |
+| Závodní taper     | Snížení objemu 40–60 %, krátká ostření                |
+| Regenerace        | Lehký objem Z1–Z2, bez strukturované intenzity        |
+
+================================================================================
+6. CTL / ATL / TSB – VÝPOČET A INTERPRETACE
+================================================================================
+
+## Vzorce (Exponenciální klouzavý průměr)
+- **TSS (Training Stress Score):** hrTSS = (duration_h) × IF² × 100
+  * IF (Intensity Factor) = avgHR / thresholdHR (ANP/LTHR)
+  * 1 hodina na prahu ≈ 100 TSS
+- **CTL** (Chronic Training Load / kondice): EWMA 42 dní
+  * CTL_new = CTL_prev + (TSS_today - CTL_prev) / 42
+- **ATL** (Acute Training Load / únava): EWMA 7 dní
+  * ATL_new = ATL_prev + (TSS_today - ATL_prev) / 7
+- **TSB** (Training Stress Balance / forma): TSB = CTL - ATL
+
+## Interpretace TSB
+| TSB           | Význam                  | Akce trenéra                                      |
+|---------------|-------------------------|---------------------------------------------------|
+| > +10         | Fresh forma             | Kvalitní trénink / závod OK                       |
+| -5 až +10     | Optimální tréninková zóna | Plán drž, kvalitu neškrtej                      |
+| -15 až -5     | Functional overreaching | Kvalitu DRŽ – mírné korekce (pauzy, −10 % objem) |
+| -25 až -15    | Kumulovaná únava        | Modifikuj intenzitu/objem, max 1 lehčí den        |
+| < -25         | Hluboká únava            | Prioritizuj regeneraci, zachovej strukturu týdne  |
+| < -35         | Akutní přetížení        | Regenerace, 1–2 lehké dny                         |
+
+PRAVIDLO: TSB mezi -15 a +5 NENÍ důvod ke zrušení kvalitní jednotky.
+
+## ReadinessScore 1–10
+- 1–3: Plná regenerace. Pouze klus, mobilita nebo volný den.
+- 4–5: Lehká zátěž. Klus Z1–Z2, max. 60 min, TF pod 70 % HRmax.
+- 6–7: Normální trénink. Plán lze dodržet.
+- 8–9: Přetížení. Modifikuj (NE ruš) – max 1 lehčí den.
+- 10: Kritická únava. Min. 2 dny volna. Netrénovat s bolestí/horečkou.
+- readinessScore ≥ 8: upřednostni modifikaci před zrušením kvality
+
+================================================================================
+7. OB / KROS / TERÉN
+================================================================================
+
+- U OB, krosu a trailu NESMÍŠ hodnotit intenzitu podle plochého tempa (min/km)
+- Používej: TF a čas v zónách, nastoupané metry (+m), TSS
+- **GAP (Grade Adjusted Pace):** adjustment = grade × 4.5 min/km; GAP = avgPace - adjustment
+- U vícedenních OB etap hlídej TSB a glykogen mezi etapami
+
+================================================================================
+8. METODICKÉ CITACE (Daniels, Seiler, Canova, Uphill Athlete, Bakken)
+================================================================================
+
+[Daniels] Prahový běh: 88–92 % TFmax.
+[Daniels] Intervaly I-fáze: VO₂max, délka úseku 3–5 minut.
+[Daniels] Regenerační trénink: skutečně lehký – pod 70 % TFmax.
+[Seiler] Polarizace: ~80 % objemu Z1–Z2, ~20 % vysoké intenzity.
+[Seiler] Min. 48 h mezi hard sessions.
+[Canova] Progrese objemu max. 10–15 % týdně.
+[Canova] Specifický trénink kopíruje požadavky závodu.
+[Uphill Athlete] Longrun: 20–30 % týdenního objemu.
+[Uphill Athlete] Poslední longrun 3 týdny před závodem.
+[Bakken] Skok longrunu > 25 % = primární riziko zranění.
+[Bakken] Konzistence easy objemu > občasný extrémní trénink.
+
+================================================================================
+9. ZDROJ: data/methodology/zakladni_metodika.txt
+================================================================================
+
+## Úroveň únavy (readinessScore 1–10)
+- 1–3: Plná regenerace. Pouze klus, mobilita nebo volný den. Žádné tempo ani intervaly.
+- 4–5: Lehká zátěž. Klus v zóně 1–2, max. 60 minut, TF pod 70 % HRmax.
+- 6–7: Normální trénink. Plán lze dodržet, ale bez navýšení objemu oproti plánu.
+- 8–9: Přetížení / únava. Příští 2 dny snížit zátěž: rest, mobilita nebo velmi lehký klus.
+- 10: Kritická únava. Minimálně 2 dny volna. Netrénovat s bolestí nebo horečkou.
+Pravidlo: Pokud readinessScore >= 8, vždy upřednostni regeneraci před plánovaným tempem nebo intervaly.
+
+## Tepové zóny (orientační)
+| Zóna | % HRmax | Charakteristika |
+|------|---------|-----------------|
+| Z1   | 59–74 % | Regenerace, rozcvička, velmi lehký klus |
+| Z2   | 75–84 % | Aerobní vytrvalost (AeT), dlouhý klus |
+| Z3   | 85–88 % | Střední zátěž, přechod mezi aerobním a anaerobním prahem |
+| Z4   | 89–94 % | Prahový běh (AnT), tempo běh |
+| Z5   | 95–100 % | VO₂max intervaly, maximální zátěž |
+Pravidlo: 80 % týdenního objemu tráv v Z1–Z2. Z4–Z5 max. 10–15 % objemu.
+
+## Intervaly
+- Účel: rozvoj VO₂max a rychlostní vytrvalosti.
+- Délka úseku: 3–5 minut v Z5, pauza 1–2 minuty klusu nebo stání.
+- Počet opakování: 4–6 dle aktuální formy a únavy.
+- Intervaly neplánuj, pokud readinessScore >= 8 nebo po 2 náročných dnech za sebou.
+- Po intervalovém tréninku následuje den lehké regenerace (Z1).
+
+## Dlouhý běh
+- 20–30 % týdenního objemu.
+- Tempo: Z2, konverzace možná celou dobu.
+- Poslední longrun 3 týdny před závodem, poté taper.
+
+================================================================================
+10. Doplňkové poznámky (strava / psychologie / regenerace – zkráceno)
+================================================================================
+
+- Dostatečný spánek a hydratace podporují adaptaci – detaily mimo scope metodiky.
+- Strava: individuální, bez rigidních diet – doplň glykogen po dlouhých bězích a hard sessions.
+- Psychologie: procesní cíle, ne extrémní tlak před závodem.
+- Regenerace: 1 lehký den/týden stačí; volno až při TSB < -30 nebo akutní nemoci.
+- Po hard session min. 48 h do další kvalitní jednotky (Seiler).

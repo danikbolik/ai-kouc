@@ -16,10 +16,19 @@ import {
   calculateHrTSS,
   inferTerrainType,
 } from './loadManagement';
+import {
+  assertDirectStravaUrl,
+  buildStravaApiUrl,
+  STRAVA_OAUTH_AUTHORIZE_URL,
+  STRAVA_OAUTH_TOKEN_URL,
+} from './strava/endpoints';
 import { stravaStartDateToUnix } from './strava/activityTimestamps';
 
-const STRAVA_API_BASE = 'https://www.strava.com/api/v3';
-const STRAVA_OAUTH_BASE = 'https://www.strava.com/oauth';
+export {
+  STRAVA_API_V3_BASE,
+  STRAVA_OAUTH_AUTHORIZE_URL,
+  STRAVA_OAUTH_TOKEN_URL,
+} from './strava/endpoints';
 
 export interface StravaTokenResponse {
   token_type: string;
@@ -97,7 +106,7 @@ export function getStravaAuthorizationUrl(
 
   if (state) params.set('state', state);
 
-  return `${STRAVA_OAUTH_BASE}/authorize?${params.toString()}`;
+  return `${STRAVA_OAUTH_AUTHORIZE_URL}?${params.toString()}`;
 }
 
 /** Vymění autorizační kód za access token */
@@ -120,7 +129,10 @@ export async function exchangeStravaCode(
     redirect_uri,
   });
 
-  const response = await fetch(`${STRAVA_OAUTH_BASE}/token`, {
+  const tokenUrl = STRAVA_OAUTH_TOKEN_URL;
+  assertDirectStravaUrl(tokenUrl);
+
+  const response = await fetch(tokenUrl, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: body.toString(),
@@ -151,7 +163,10 @@ export async function refreshStravaToken(
     grant_type: 'refresh_token',
   });
 
-  const response = await fetch(`${STRAVA_OAUTH_BASE}/token`, {
+  const tokenUrl = STRAVA_OAUTH_TOKEN_URL;
+  assertDirectStravaUrl(tokenUrl);
+
+  const response = await fetch(tokenUrl, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: body.toString(),
@@ -229,7 +244,8 @@ function sleep(ms: number): Promise<void> {
 }
 
 async function stravaFetch<T>(accessToken: string, path: string): Promise<T> {
-  const response = await fetch(`${STRAVA_API_BASE}${path}`, {
+  const url = buildStravaApiUrl(path);
+  const response = await fetch(url, {
     headers: { Authorization: `Bearer ${accessToken}` },
     next: { revalidate: 0 },
   });
@@ -416,7 +432,8 @@ export async function fetchRecentActivities(
     params.set('after', String(options.after));
   }
 
-  const response = await fetch(`${STRAVA_API_BASE}/athlete/activities?${params}`, {
+  const url = buildStravaApiUrl(`/athlete/activities?${params}`);
+  const response = await fetch(url, {
     headers: { Authorization: `Bearer ${accessToken}` },
     next: { revalidate: 0 },
   });
@@ -512,7 +529,8 @@ export async function fetchActivityById(
   accessToken: string,
   activityId: number,
 ): Promise<StravaActivity> {
-  const response = await fetch(`${STRAVA_API_BASE}/activities/${activityId}`, {
+  const url = buildStravaApiUrl(`/activities/${activityId}`);
+  const response = await fetch(url, {
     headers: { Authorization: `Bearer ${accessToken}` },
     next: { revalidate: 0 },
   });

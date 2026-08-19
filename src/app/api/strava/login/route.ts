@@ -4,8 +4,7 @@ import {
   getStravaClientIdFromEnv,
   getStravaRedirectUriForRequest,
 } from '@/lib/strava/env';
-
-const STRAVA_AUTHORIZE_URL = 'https://www.strava.com/oauth/authorize';
+import { STRAVA_OAUTH_AUTHORIZE_URL } from '@/lib/strava/endpoints';
 
 /** Zahájí Strava OAuth2 flow – přesměruje na oficiální přihlašovací stránku Stravy. */
 export async function GET(request: Request) {
@@ -43,5 +42,5 @@ export async function GET(request: Request) {
     state,
   });
 
-  return NextResponse.redirect(`${STRAVA_AUTHORIZE_URL}?${params.toString()}`);
+  return NextResponse.redirect(`${STRAVA_OAUTH_AUTHORIZE_URL}?${params.toString()}`);
 }

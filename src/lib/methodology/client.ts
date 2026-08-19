@@ -1,4 +1,5 @@
 import { buildApiKeyHeaders } from '@/lib/apiKeyHeaders';
+import { isSupportedMethodologyFile, readMethodologyFile } from '@/lib/readMethodologyFile';
 import { getOrCreateUserId } from '@/lib/userId';
 import type { UploadedMethodology } from '@/types/settings';
 
@@ -35,27 +36,53 @@ export async function uploadMethodologyDocumentFile(
   file: File,
   apiKeys: Parameters<typeof buildApiKeyHeaders>[0],
 ): Promise<UploadedMethodology> {
-  const formData = new FormData();
-  formData.append('file', file);
+  if (!isSupportedMethodologyFile(file)) {
+    throw new Error(`Soubor "${file.name}" není podporovaný (.pdf, .txt, .md).`);
+  }
 
+  const { fileType, content } = await readMethodologyFile(file);
+  return uploadMethodologyParsedContent(file.name, fileType, content, apiKeys);
+}
+
+export async function uploadMethodologyParsedContent(
+  fileName: string,
+  fileType: UploadedMethodology['fileType'],
+  content: string,
+  apiKeys: Parameters<typeof buildApiKeyHeaders>[0],
+): Promise<UploadedMethodology> {
   const response = await fetch('/api/methodology', {
     method: 'POST',
     headers: {
+      'Content-Type': 'application/json',
       'X-User-Id': getOrCreateUserId(),
       ...(buildApiKeyHeaders(apiKeys)['x-openai-key']
         ? { 'x-openai-key': buildApiKeyHeaders(apiKeys)['x-openai-key']! }
         : {}),
     },
-    body: formData,
+    body: JSON.stringify({ fileName, fileType, content }),
   });
 
+  const body = (await response.json().catch(() => ({}))) as {
+    error?: string;
+    code?: string;
+    document?: UploadedMethodology;
+    warning?: string;
+  };
+
   if (!response.ok) {
-    const body = (await response.json().catch(() => ({}))) as { error?: string };
-    throw new Error(body.error ?? `Nahrání selhalo (${response.status})`);
+    const detail = body.error ?? `Nahrání selhalo (${response.status})`;
+    throw new Error(body.code ? `${detail} [${body.code}]` : detail);
   }
 
-  const json = (await response.json()) as { document: UploadedMethodology };
-  return json.document;
+  if (!body.document) {
+    throw new Error('Server nevrátil uložený dokument.');
+  }
+
+  if (body.warning) {
+    console.warn('[uploadMethodologyParsedContent]', body.warning);
+  }
+
+  return body.document;
 }
 
 export async function deleteMethodologyDocumentRemote(

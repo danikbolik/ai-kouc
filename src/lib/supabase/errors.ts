@@ -34,6 +34,38 @@ export function isMissingColumnError(error: unknown, column: string): boolean {
   );
 }
 
+export function isMissingTableError(error: unknown, table: string): boolean {
+  if (!error || typeof error !== 'object' || !('message' in error)) return false;
+  const pg = error as PostgrestError;
+  const message = String(pg.message ?? '').toLowerCase();
+  const tableLower = table.toLowerCase();
+  return (
+    pg.code === '42P01' ||
+    (message.includes(tableLower) && message.includes('does not exist'))
+  );
+}
+
+export function formatStorageError(
+  context: string,
+  error: unknown,
+  extra?: Record<string, unknown>,
+): string {
+  if (error && typeof error === 'object' && 'message' in error) {
+    const storageError = error as { message?: string; error?: string; statusCode?: string };
+    const parts = [
+      context,
+      storageError.message ?? storageError.error,
+      storageError.statusCode ? `status=${storageError.statusCode}` : null,
+    ].filter(Boolean);
+    console.error(`[Supabase Storage] ${parts.join(' | ')}`, { ...extra, error: storageError });
+    return parts.join(' | ');
+  }
+
+  const message = error instanceof Error ? error.message : String(error);
+  console.error(`[Supabase Storage] ${context} | ${message}`, extra);
+  return `${context} | ${message}`;
+}
+
 export function isUpsertConflictError(error: unknown): boolean {
   if (!error || typeof error !== 'object') return false;
   const pg = error as PostgrestError;

@@ -1,6 +1,6 @@
 import { randomUUID } from 'crypto';
 
-import { formatSupabaseError } from '@/lib/supabase/errors';
+import { formatStorageError, formatSupabaseError, isMissingTableError } from '@/lib/supabase/errors';
 import { getSupabaseAdmin, isCloudDbConfigured } from '@/lib/supabase/server';
 import type { UploadedMethodology } from '@/types/settings';
 
@@ -44,6 +44,11 @@ export async function listMethodologyDocuments(userId: string): Promise<Uploaded
     .order('uploaded_at', { ascending: true });
 
   if (error) {
+    if (isMissingTableError(error, 'methodology_documents')) {
+      throw new Error(
+        'Tabulka methodology_documents neexistuje. V Supabase SQL Editoru spusť supabase/migrations/004_methodology_documents.sql',
+      );
+    }
     throw new Error(formatSupabaseError('listMethodologyDocuments SELECT failed', error, { userId }));
   }
 
@@ -55,8 +60,8 @@ export async function uploadMethodologyDocument(
   fileName: string,
   fileType: UploadedMethodology['fileType'],
   content: string,
-  fileBuffer: Buffer,
-): Promise<UploadedMethodology> {
+  fileBuffer?: Buffer | null,
+): Promise<UploadedMethodology & { storageWarning?: string }> {
   const supabase = getSupabaseAdmin();
   if (!supabase) {
     throw new Error('Cloud databáze není nakonfigurována.');
@@ -65,26 +70,32 @@ export async function uploadMethodologyDocument(
   const docId = randomUUID();
   const storagePath = buildStoragePath(userId, docId, fileName);
   const uploadedAt = new Date().toISOString();
+  let finalStoragePath: string | null = null;
+  let storageWarning: string | undefined;
 
-  const { error: storageError } = await supabase.storage
-    .from(METHODOLOGY_BUCKET)
-    .upload(storagePath, fileBuffer, {
-      contentType:
-        fileType === 'pdf'
-          ? 'application/pdf'
-          : fileType === 'md'
-            ? 'text/markdown'
-            : 'text/plain',
-      upsert: false,
-    });
+  if (fileBuffer && fileBuffer.length > 0) {
+    const { error: storageError } = await supabase.storage
+      .from(METHODOLOGY_BUCKET)
+      .upload(storagePath, fileBuffer, {
+        contentType:
+          fileType === 'pdf'
+            ? 'application/pdf'
+            : fileType === 'md'
+              ? 'text/markdown'
+              : 'text/plain',
+        upsert: false,
+      });
 
-  if (storageError) {
-    throw new Error(
-      formatSupabaseError('methodology Storage upload failed', storageError, {
+    if (storageError) {
+      storageWarning = formatStorageError('Storage upload skipped', storageError, {
         userId,
         storagePath,
-      }),
-    );
+        hint: 'V Supabase vytvoř bucket methodology_docs nebo spusť migraci 004_methodology_documents.sql',
+      });
+      console.warn('[uploadMethodologyDocument]', storageWarning);
+    } else {
+      finalStoragePath = storagePath;
+    }
   }
 
   const row: MethodologyDocumentRow = {
@@ -92,7 +103,7 @@ export async function uploadMethodologyDocument(
     user_id: userId,
     file_name: fileName,
     file_type: fileType,
-    storage_path: storagePath,
+    storage_path: finalStoragePath,
     content,
     char_count: content.length,
     uploaded_at: uploadedAt,
@@ -105,11 +116,19 @@ export async function uploadMethodologyDocument(
     .single();
 
   if (error) {
-    await supabase.storage.from(METHODOLOGY_BUCKET).remove([storagePath]);
+    if (finalStoragePath) {
+      await supabase.storage.from(METHODOLOGY_BUCKET).remove([finalStoragePath]);
+    }
+    if (isMissingTableError(error, 'methodology_documents')) {
+      throw new Error(
+        'Tabulka methodology_documents neexistuje. V Supabase SQL Editoru spusť soubor supabase/migrations/004_methodology_documents.sql',
+      );
+    }
     throw new Error(formatSupabaseError('methodology_documents INSERT failed', error, { userId }));
   }
 
-  return rowToUploadedMethodology(data as MethodologyDocumentRow);
+  const document = rowToUploadedMethodology(data as MethodologyDocumentRow);
+  return storageWarning ? { ...document, storageWarning } : document;
 }
 
 export async function deleteMethodologyDocument(

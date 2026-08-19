@@ -2,12 +2,14 @@
 
 import { useEffect, useState } from 'react';
 import {
+  createUploadedMethodology,
   formatFileSize,
   isSupportedMethodologyFile,
+  readMethodologyFile,
 } from '../../lib/readMethodologyFile';
 import {
   deleteMethodologyDocumentRemote,
-  uploadMethodologyDocumentFile,
+  uploadMethodologyParsedContent,
 } from '../../lib/methodology/client';
 import { linkCloudAccountAndHydrate, pushLocalDataToCloud } from '../providers/CloudSyncProvider';
 import { getOrCreateUserId, isValidUserIdFormat } from '../../lib/userId';
@@ -208,8 +210,25 @@ export function SettingsDrawer() {
           throw new Error(`Soubor "${file.name}" není podporovaný (.pdf, .txt, .md).`);
         }
 
-        const document = await uploadMethodologyDocumentFile(file, storedApiKeys);
-        addUploadedMethodology(document);
+        const { fileType, content } = await readMethodologyFile(file);
+
+        try {
+          const document = await uploadMethodologyParsedContent(
+            file.name,
+            fileType,
+            content,
+            storedApiKeys,
+          );
+          addUploadedMethodology(document);
+        } catch (cloudError) {
+          const cloudMessage =
+            cloudError instanceof Error ? cloudError.message : 'Cloud upload selhal';
+          const localDocument = createUploadedMethodology(file.name, fileType, content);
+          addUploadedMethodology(localDocument);
+          setUploadError(
+            `Cloud: ${cloudMessage}. Dokument je uložen lokálně v tomto prohlížeči a AI ho použije.`,
+          );
+        }
       }
     } catch (error) {
       setUploadError(error instanceof Error ? error.message : 'Nahrání souboru selhalo.');
@@ -633,8 +652,9 @@ export function SettingsDrawer() {
                 <div>
                   <h3 className="text-sm font-semibold text-slate-900">API klíče</h3>
                   <p className="mt-1 text-xs text-slate-500">
-                    Osobní parametry, paměť trenéra a metodika se automaticky synchronizují do
-                    Supabase. Na mobilu propoj stejný účet přes Strava nebo vlož Cloud ID z PC.
+                    Změny (parametry, paměť trenéra, kalendář) se do Supabase ukládají{' '}
+                    <strong>automaticky cca 2 s po úpravě</strong> – nemusíš klikat na tlačítko
+                    níže. Tlačítko je jen pro první naplnění prázdné tabulky nebo ruční obnovu.
                   </p>
                   <p className="mt-2 rounded-lg bg-slate-100 px-3 py-2 text-[10px] text-slate-600">
                     Cloud ID tohoto zařízení:{' '}
@@ -651,8 +671,9 @@ export function SettingsDrawer() {
 
                   <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3">
                     <p className="text-[11px] text-amber-900">
-                      Prázdná tabulka v Supabase je normální při prvním spuštění. Na PC klikni níže
-                      a odešli lokální data do cloudu. Pak Cloud ID zkopíruj na mobil.
+                      <strong>Jednorázově:</strong> pokud je tabulka user_data v Supabase prázdná,
+                      klikni níže a odešli data z PC. Potom Cloud ID zkopíruj na mobil. Při běžném
+                      používání stačí automatický sync (sync: idle).
                     </p>
                     <button
                       type="button"

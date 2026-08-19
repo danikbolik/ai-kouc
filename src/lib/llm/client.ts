@@ -1,3 +1,4 @@
+import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import { createOpenAI } from '@ai-sdk/openai';
 import { generateObject, generateText, streamText, tool } from 'ai';
 import { z } from 'zod';
@@ -35,7 +36,16 @@ import {
 import type { CoachNote, CoachNoteInput } from '@/types/coachNotes';
 import type { DayData, WorkoutSession } from '@/types/training';
 
-const DEFAULT_MODEL = process.env.OPENAI_MODEL ?? 'gpt-4o';
+const DEFAULT_OPENAI_MODEL = process.env.OPENAI_MODEL ?? 'gpt-4o';
+const DEFAULT_GEMINI_MODEL = process.env.GEMINI_MODEL ?? 'gemini-2.5-flash';
+
+export type ChatLlmProvider = 'gemini' | 'openai';
+
+export interface ChatLlmCallOptions {
+  provider?: ChatLlmProvider;
+  systemMethodologyContext?: string;
+  chatHistory?: { role: 'user' | 'assistant'; content: string }[];
+}
 
 type LlmRecalculateResponse = z.infer<typeof recalculateResponseSchema>;
 
@@ -136,7 +146,34 @@ function normalizeUpdatedDays(
 
 function createOpenAiModel(apiKey: string) {
   const provider = createOpenAI({ apiKey });
-  return provider(DEFAULT_MODEL);
+  return provider(DEFAULT_OPENAI_MODEL);
+}
+
+function createGeminiModel(apiKey: string) {
+  const google = createGoogleGenerativeAI({ apiKey });
+  return google(DEFAULT_GEMINI_MODEL);
+}
+
+function createChatModel(apiKey: string, provider: ChatLlmProvider) {
+  return provider === 'gemini' ? createGeminiModel(apiKey) : createOpenAiModel(apiKey);
+}
+
+export function isGeminiConfigured(apiKey?: string): boolean {
+  const key = apiKey?.trim() || process.env.GEMINI_API_KEY?.trim();
+  return Boolean(key && !isPlaceholderApiKey(key));
+}
+
+export function resolveChatLlmProvider(
+  geminiKey?: string,
+  openAiKey?: string,
+): { provider: ChatLlmProvider; apiKey: string } | null {
+  if (geminiKey && isGeminiConfigured(geminiKey)) {
+    return { provider: 'gemini', apiKey: geminiKey };
+  }
+  if (openAiKey && isOpenAiConfigured(openAiKey)) {
+    return { provider: 'openai', apiKey: openAiKey };
+  }
+  return null;
 }
 
 export function isOpenAiConfigured(apiKey?: string): boolean {
@@ -246,13 +283,20 @@ export function streamChatWithLlm(
   apiKey: string,
   visiblePeriod?: Parameters<typeof buildChatUserPrompt>[4],
   allTrainingDays?: Record<string, import('@/types/training').DayData>,
+  options?: ChatLlmCallOptions,
 ) {
   const daysRecord =
     allTrainingDays ??
     Object.fromEntries((trainingLog ?? []).map((day) => [day.date, day]));
+  const provider = options?.provider ?? 'openai';
   return streamText({
-    model: createOpenAiModel(apiKey),
-    system: buildLlmSystemPrompt(CHAT_SYSTEM_PROMPT, methodicContext),
+    model: createChatModel(apiKey, provider),
+    system: buildLlmSystemPrompt(
+      CHAT_SYSTEM_PROMPT,
+      methodicContext,
+      undefined,
+      options?.systemMethodologyContext,
+    ),
     prompt: buildChatUserPrompt(
       message,
       trainingLog,
@@ -262,6 +306,7 @@ export function streamChatWithLlm(
       Object.keys(daysRecord).length
         ? buildAiContextSummaries(daysRecord, userMetrics)
         : undefined,
+      options?.chatHistory,
     ),
     temperature: 0.2,
   });
@@ -276,6 +321,7 @@ export async function chatWithTools(
   visiblePeriod?: Parameters<typeof buildChatUserPrompt>[4],
   coachNotes: CoachNote[] = [],
   allTrainingDays?: Record<string, import('@/types/training').DayData>,
+  options?: ChatLlmCallOptions,
 ) {
   const coachNotesContext = buildCoachNotesPromptSection(coachNotes);
   const daysRecord =
@@ -284,10 +330,16 @@ export async function chatWithTools(
   const historySummaries = Object.keys(daysRecord).length
     ? buildAiContextSummaries(daysRecord, userMetrics)
     : undefined;
+  const provider = options?.provider ?? 'openai';
 
   const result = await generateText({
-    model: createOpenAiModel(apiKey),
-    system: buildLlmSystemPrompt(CHAT_SYSTEM_PROMPT, methodicContext, coachNotesContext),
+    model: createChatModel(apiKey, provider),
+    system: buildLlmSystemPrompt(
+      CHAT_SYSTEM_PROMPT,
+      methodicContext,
+      coachNotesContext,
+      options?.systemMethodologyContext,
+    ),
     prompt: buildChatUserPrompt(
       message,
       trainingLog,
@@ -295,6 +347,7 @@ export async function chatWithTools(
       methodicContext,
       visiblePeriod,
       historySummaries,
+      options?.chatHistory,
     ),
     tools: {
       update_calendar_workouts: tool({

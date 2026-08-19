@@ -230,6 +230,25 @@ ${WORKOUT_PLAN_CHAT_FORMAT_EXAMPLE}`);
   return parts.length > 0 ? parts.join('\n\n') : '';
 }
 
+function buildChatHistoryContext(
+  chatHistory?: { role: 'user' | 'assistant'; content: string }[],
+): string {
+  if (!chatHistory?.length) return '';
+
+  const lines = chatHistory
+    .filter((entry) => entry.content.trim())
+    .slice(-24)
+    .map(
+      (entry) =>
+        `**${entry.role === 'user' ? 'Sportovec' : 'Trenér'}:** ${entry.content.trim()}`,
+    );
+
+  if (lines.length === 0) return '';
+
+  return `## Historie chatu (zachovej návaznost odpovědi)
+${lines.join('\n\n')}`;
+}
+
 export function buildChatUserPrompt(
   message: string,
   trainingLog: DayData[] | undefined,
@@ -249,6 +268,7 @@ export function buildChatUserPrompt(
     upcomingPlanSummary: string;
     planComparisonSummary: string;
   },
+  chatHistory?: { role: 'user' | 'assistant'; content: string }[],
 ): string {
   const sortedLog = [...(trainingLog ?? [])].sort((a, b) => a.date.localeCompare(b.date));
 
@@ -269,12 +289,13 @@ export function buildChatUserPrompt(
   const upcomingBlock = historySummaries?.upcomingPlanSummary ?? '';
   const comparisonBlock = historySummaries?.planComparisonSummary ?? '';
   const queryInstructions = buildQuerySpecificInstructions(message);
+  const chatHistoryBlock = buildChatHistoryContext(chatHistory);
 
   return `
 ## Dotaz sportovce
 ${message}
 
-${queryInstructions ? `${queryInstructions}\n\n` : ''}## Profil sportovce – zóny, cíle a fáze (VYHODNOCUJ TRÉNINKY STRIKTNĚ PODLE TĚCHTO ZÓN)
+${chatHistoryBlock ? `${chatHistoryBlock}\n\n` : ''}${queryInstructions ? `${queryInstructions}\n\n` : ''}## Profil sportovce – zóny, cíle a fáze (VYHODNOCUJ TRÉNINKY STRIKTNĚ PODLE TĚCHTO ZÓN)
 ${userMetrics ? buildUserProfileContext(userMetrics) : 'N/A'}
 
 ${macrocycleBlock}
@@ -376,12 +397,18 @@ export function buildLlmSystemPrompt(
   basePrompt: string,
   methodicContext: string,
   coachNotesContext?: string,
+  systemMethodologyContext?: string,
 ): string {
   const notesBlock = coachNotesContext?.trim()
     ? `\n\n## ${coachNotesContext.trim()}`
     : '';
 
-  return `${basePrompt}
+  const methodologyFolderBlock = systemMethodologyContext?.trim()
+    ? `\n\n## SYSTEM_METHODOLOGY_CONTEXT
+${systemMethodologyContext.trim()}`
+    : '';
+
+  return `${basePrompt}${methodologyFolderBlock}
 
 ## Přiložený metodický kontext (RAG)
 ${methodicContext}${notesBlock}`;

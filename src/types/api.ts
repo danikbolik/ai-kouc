@@ -35,6 +35,8 @@ export interface ChatRequest {
   coachNotes?: import('./coachNotes').CoachNote[];
   /** Kompletní kalendář pro long-term statistiky (až 12 měsíců) */
   allTrainingDays?: Record<string, import('./training').DayData>;
+  /** Předchozí zprávy chatu pro návaznost konverzace */
+  chatHistory?: { role: 'user' | 'assistant'; content: string }[];
 }
 
 export interface ChatResponse {

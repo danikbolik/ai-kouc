@@ -386,6 +386,13 @@ export function ChatView() {
           uploadedMethodology,
           visiblePeriod,
           coachNotes,
+          chatHistory: messages
+            .filter((entry) => entry.id !== CHAT_WELCOME_MESSAGE.id && !entry.isStreaming && entry.text.trim())
+            .slice(-24)
+            .map((entry) => ({
+              role: entry.sender === 'user' ? ('user' as const) : ('assistant' as const),
+              content: entry.text.trim(),
+            })),
         };
 
         const useStream = false;

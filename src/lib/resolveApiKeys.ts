@@ -20,6 +20,22 @@ export function isPlaceholderApiKey(key?: string): boolean {
   return PLACEHOLDER_KEY_PATTERNS.some((pattern) => pattern.test(trimmed));
 }
 
+/** Gemini klíč: hlavička x-gemini-key → fallback process.env.GEMINI_API_KEY */
+export function resolveGeminiKey(request: Request): string | undefined {
+  const headerKey = request.headers.get('x-gemini-key')?.trim();
+  if (headerKey && !isPlaceholderApiKey(headerKey)) return headerKey;
+
+  const envKey = process.env.GEMINI_API_KEY?.trim();
+  if (envKey && !isPlaceholderApiKey(envKey)) return envKey;
+
+  return undefined;
+}
+
+export function isGeminiConfigured(apiKey?: string): boolean {
+  const key = apiKey?.trim() || process.env.GEMINI_API_KEY?.trim();
+  return Boolean(key && !isPlaceholderApiKey(key));
+}
+
 /** OpenAI klíč: hlavička x-openai-key → fallback process.env.OPENAI_API_KEY */
 export function resolveOpenAiKey(request: Request): string | undefined {
   const headerKey = request.headers.get('x-openai-key')?.trim();

@@ -44,6 +44,7 @@ export type ChatLlmProvider = 'gemini' | 'openai';
 export interface ChatLlmCallOptions {
   provider?: ChatLlmProvider;
   systemMethodologyContext?: string;
+  uploadedMethodologyContext?: string;
   chatHistory?: { role: 'user' | 'assistant'; content: string }[];
 }
 
@@ -257,7 +258,9 @@ export async function recalculateWithLlm(
   const { object } = await generateObject({
     model: createOpenAiModel(apiKey),
     schema: recalculateResponseSchema,
-    system: buildLlmSystemPrompt(RECALCULATE_SYSTEM_PROMPT, methodicContext),
+    system: buildLlmSystemPrompt(RECALCULATE_SYSTEM_PROMPT, {
+      methodicRagContext: methodicContext,
+    }),
     prompt: buildRecalculateUserPrompt(request, methodicContext),
     temperature: 0.2,
   });
@@ -277,11 +280,10 @@ export function buildRecalculateMethodicContext(readinessScore: number): string 
 
 export function streamChatWithLlm(
   message: string,
-  methodicContext: string,
   trainingLog: Parameters<typeof buildChatUserPrompt>[1],
   userMetrics: Parameters<typeof buildChatUserPrompt>[2],
   apiKey: string,
-  visiblePeriod?: Parameters<typeof buildChatUserPrompt>[4],
+  visiblePeriod?: Parameters<typeof buildChatUserPrompt>[3],
   allTrainingDays?: Record<string, import('@/types/training').DayData>,
   options?: ChatLlmCallOptions,
 ) {
@@ -291,17 +293,14 @@ export function streamChatWithLlm(
   const provider = options?.provider ?? 'openai';
   return streamText({
     model: createChatModel(apiKey, provider),
-    system: buildLlmSystemPrompt(
-      CHAT_SYSTEM_PROMPT,
-      methodicContext,
-      undefined,
-      options?.systemMethodologyContext,
-    ),
+    system: buildLlmSystemPrompt(CHAT_SYSTEM_PROMPT, {
+      systemMethodologyContext: options?.systemMethodologyContext,
+      uploadedMethodologyContext: options?.uploadedMethodologyContext,
+    }),
     prompt: buildChatUserPrompt(
       message,
       trainingLog,
       userMetrics,
-      methodicContext,
       visiblePeriod,
       Object.keys(daysRecord).length
         ? buildAiContextSummaries(daysRecord, userMetrics)
@@ -314,11 +313,10 @@ export function streamChatWithLlm(
 
 export async function chatWithTools(
   message: string,
-  methodicContext: string,
   trainingLog: Parameters<typeof buildChatUserPrompt>[1],
   userMetrics: Parameters<typeof buildChatUserPrompt>[2],
   apiKey: string,
-  visiblePeriod?: Parameters<typeof buildChatUserPrompt>[4],
+  visiblePeriod?: Parameters<typeof buildChatUserPrompt>[3],
   coachNotes: CoachNote[] = [],
   allTrainingDays?: Record<string, import('@/types/training').DayData>,
   options?: ChatLlmCallOptions,
@@ -334,17 +332,15 @@ export async function chatWithTools(
 
   const result = await generateText({
     model: createChatModel(apiKey, provider),
-    system: buildLlmSystemPrompt(
-      CHAT_SYSTEM_PROMPT,
-      methodicContext,
+    system: buildLlmSystemPrompt(CHAT_SYSTEM_PROMPT, {
       coachNotesContext,
-      options?.systemMethodologyContext,
-    ),
+      systemMethodologyContext: options?.systemMethodologyContext,
+      uploadedMethodologyContext: options?.uploadedMethodologyContext,
+    }),
     prompt: buildChatUserPrompt(
       message,
       trainingLog,
       userMetrics,
-      methodicContext,
       visiblePeriod,
       historySummaries,
       options?.chatHistory,
@@ -439,12 +435,12 @@ export async function chatWithTools(
 
 export async function chatWithLlmStructured(
   message: string,
-  methodicContext: string,
   trainingLog: Parameters<typeof buildChatUserPrompt>[1],
   userMetrics: Parameters<typeof buildChatUserPrompt>[2],
   apiKey: string,
-  visiblePeriod?: Parameters<typeof buildChatUserPrompt>[4],
+  visiblePeriod?: Parameters<typeof buildChatUserPrompt>[3],
   allTrainingDays?: Record<string, import('@/types/training').DayData>,
+  options?: ChatLlmCallOptions,
 ) {
   const daysRecord =
     allTrainingDays ??
@@ -452,19 +448,22 @@ export async function chatWithLlmStructured(
   const { object } = await generateObject({
     model: createOpenAiModel(apiKey),
     schema: chatResponseSchema,
-    system: `${buildLlmSystemPrompt(CHAT_SYSTEM_PROMPT, methodicContext)}
+    system: `${buildLlmSystemPrompt(CHAT_SYSTEM_PROMPT, {
+      systemMethodologyContext: options?.systemMethodologyContext,
+      uploadedMethodologyContext: options?.uploadedMethodologyContext,
+    })}
 
-Vrať references POUZE z přiloženého metodického kontextu. Pokud kontext nestačí, references může být prázdné pole a replyText musí obsahovat větu o nedostatečných podkladech.
+Vrať references POUZE z metodického kontextu v system promptu. Pokud kontext nestačí, references může být prázdné pole a replyText musí obsahovat větu o nedostatečných podkladech.
 Pokud sportovec žádá úpravu plánu, vyplň calendarActions. Jinak vrať prázdné pole calendarActions.`,
     prompt: buildChatUserPrompt(
       message,
       trainingLog,
       userMetrics,
-      methodicContext,
       visiblePeriod,
       Object.keys(daysRecord).length
         ? buildAiContextSummaries(daysRecord, userMetrics)
         : undefined,
+      options?.chatHistory,
     ),
     temperature: 0.2,
   });

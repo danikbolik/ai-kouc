@@ -27,6 +27,13 @@ ${truncateForApi(doc.content)}`;
 ${sections.join('\n\n')}`;
 }
 
+/** Pouze nahrané podklady uživatele (Supabase) – bez vestavěné RAG knihovny. */
+export function buildUploadedMethodologyContext(
+  documents?: UploadedMethodology[],
+): string {
+  return formatUploadedMethodology(documents) ?? '';
+}
+
 export function buildMethodicContext(options: {
   localMethodologyContext?: string;
   uploadedMethodology?: UploadedMethodology[];

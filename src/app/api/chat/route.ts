@@ -9,7 +9,7 @@ import {
   resolveChatLlmProvider,
   streamChatWithLlm,
 } from '@/lib/llm/client';
-import { buildMethodicContext } from '@/lib/methodologyContext';
+import { buildUploadedMethodologyContext } from '@/lib/methodologyContext';
 import { chunksToReferences, CHAT_RAG_TOP_K, searchKnowledge } from '@/lib/ragKnowledge';
 import { resolveGeminiKey, resolveOpenAiKey } from '@/lib/resolveApiKeys';
 import type { ChatRequest } from '@/types/api';
@@ -60,17 +60,15 @@ export async function POST(request: Request) {
     const trainingLog = normalizeTrainingLog(body.trainingLog);
     const visiblePeriod = body.visiblePeriod;
     const SYSTEM_METHODOLOGY_CONTEXT = await loadSystemMethodologyContext();
-
-    const methodicContext = buildMethodicContext({
-      uploadedMethodology: body.uploadedMethodology,
-      query: body.message,
-      includeFullLibrary: true,
-    });
+    const uploadedMethodologyContext = buildUploadedMethodologyContext(
+      body.uploadedMethodology,
+    );
 
     const ragReferences = chunksToReferences(searchKnowledge(body.message, CHAT_RAG_TOP_K));
     const chatOptions = {
       provider: llm.provider,
       systemMethodologyContext: SYSTEM_METHODOLOGY_CONTEXT,
+      uploadedMethodologyContext: uploadedMethodologyContext || undefined,
       chatHistory: body.chatHistory,
     };
 
@@ -78,7 +76,6 @@ export async function POST(request: Request) {
       if (stream) {
         const result = streamChatWithLlm(
           body.message,
-          methodicContext,
           trainingLog,
           body.userMetrics,
           llm.apiKey,
@@ -136,7 +133,6 @@ export async function POST(request: Request) {
 
       const llmResult = await chatWithTools(
         body.message,
-        methodicContext,
         trainingLog,
         body.userMetrics,
         llm.apiKey,

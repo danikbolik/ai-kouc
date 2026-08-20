@@ -253,7 +253,6 @@ export function buildChatUserPrompt(
   message: string,
   trainingLog: DayData[] | undefined,
   userMetrics?: UserMetrics,
-  methodicContext?: string,
   visiblePeriod?: { from: string; to: string },
   historySummaries?: {
     stravaHistorySummary: string;
@@ -320,8 +319,8 @@ ${upcomingBlock}
 
 ${comparisonBlock}
 
-## Metodický RAG kontext (MULTI-SOURCE – syntetizuj minimálně 2–3 různé zdroje v každé odpovědi)
-${methodicContext ?? 'Kontext nedostupný – odpověz, že chybí metodické podklady.'}
+## Metodika
+Metodický kontext (METODIKA_SUMAR.txt + případné nahrané podklady) je v system promptu – neopakuj ho, cituj podle něj.
 
 ## Tréninkový kalendář – plánované i odtrénované tréninky (detail)
 ${periodLine}
@@ -393,23 +392,43 @@ export function enforceLockedSessions(
   return merged;
 }
 
+export interface LlmSystemPromptOptions {
+  coachNotesContext?: string;
+  /** METODIKA_SUMAR.txt – hlavní metodický podklad */
+  systemMethodologyContext?: string;
+  /** Nahrané podklady uživatele (Supabase) */
+  uploadedMethodologyContext?: string;
+  /** Vestavěná RAG knihovna – pouze pro /api/recalculate */
+  methodicRagContext?: string;
+}
+
 export function buildLlmSystemPrompt(
   basePrompt: string,
-  methodicContext: string,
-  coachNotesContext?: string,
-  systemMethodologyContext?: string,
+  options: LlmSystemPromptOptions = {},
 ): string {
-  const notesBlock = coachNotesContext?.trim()
-    ? `\n\n## ${coachNotesContext.trim()}`
+  const notesBlock = options.coachNotesContext?.trim()
+    ? `\n\n## ${options.coachNotesContext.trim()}`
     : '';
 
-  const methodologyFolderBlock = systemMethodologyContext?.trim()
-    ? `\n\n## SYSTEM_METHODOLOGY_CONTEXT
-${systemMethodologyContext.trim()}`
-    : '';
+  const blocks: string[] = [];
 
-  return `${basePrompt}${methodologyFolderBlock}
+  if (options.systemMethodologyContext?.trim()) {
+    blocks.push(
+      `## SYSTEM_METHODOLOGY_CONTEXT\n${options.systemMethodologyContext.trim()}`,
+    );
+  }
 
-## Přiložený metodický kontext (RAG)
-${methodicContext}${notesBlock}`;
+  if (options.uploadedMethodologyContext?.trim()) {
+    blocks.push(options.uploadedMethodologyContext.trim());
+  }
+
+  if (options.methodicRagContext?.trim()) {
+    blocks.push(
+      `## Přiložený metodický kontext (RAG)\n${options.methodicRagContext.trim()}`,
+    );
+  }
+
+  const methodologyBlock = blocks.length > 0 ? `\n\n${blocks.join('\n\n')}` : '';
+
+  return `${basePrompt}${methodologyBlock}${notesBlock}`;
 }
